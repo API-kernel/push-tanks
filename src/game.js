@@ -4,6 +4,7 @@ import { SPRITES, TILE_SIZE } from './sprites.js';
 import { InputHandler } from './input.js';
 import { level1, drawLevel } from './level.js'; 
 import { canMoveTo } from './physics.js'; 
+import { createBullet, updateBullets, drawBullets, bullets } from './bullet.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -18,46 +19,47 @@ const game = {
 
 const player = {
     x: 0,
-    y: 0,
+    y: 100,
     speed: 1,
     direction: 'UP',
     isMoving: false,
     frameIndex: 0,
     frameTimer: 0,
-    animationSpeed: 3
+    animationSpeed: 8,
+    bulletCooldown: 0 // Таймер для стрельбы
 };
 
-// 1. Сначала определяем функцию ONLOAD
+// 1. Сначала определяем обработчики событий
 game.sprites.onload = () => {
-    console.log("Картинка загружена, старт!"); // <--- Должно появиться!
+    console.log("Картинка загружена, старт!");
     game.isLoaded = true;
     requestAnimationFrame(loop);
 };
 
-// 2. Обработка ошибок загрузки
 game.sprites.onerror = () => {
     console.error("КРИТИЧЕСКАЯ ОШИБКА: Картинка ./assets/sprites.png не найдена!");
 };
 
+// 2. Игровой цикл
 function loop() {
-    // Оборачиваем в try-catch, чтобы видеть ошибки внутри цикла
     try {
         update();
         draw();
         requestAnimationFrame(loop);
     } catch (e) {
-        console.error("ИГРА УПАЛА:", e); // Если тут будет ошибка, мы ее увидим
+        console.error("ИГРА УПАЛА:", e);
     }
 }
 
+// 3. Обновление логики
 function update() {
+    // --- А. Движение Игрока ---
     const direction = game.input.getDirection();
 
     if (direction) {
         player.isMoving = true;
         player.direction = direction;
 
-        // Физика и Движение
         let nextX = player.x;
         let nextY = player.y;
 
@@ -66,7 +68,7 @@ function update() {
         else if (direction === 'LEFT') nextX -= player.speed;
         else if (direction === 'RIGHT') nextX += player.speed;
 
-        // Проверка коллизий
+        // Физика
         const isInsideMap = 
             nextX >= 0 && 
             nextY >= 0 && 
@@ -77,7 +79,7 @@ function update() {
             player.x = nextX;
             player.y = nextY;
 
-            // Анимация
+            // Анимация гусениц
             player.frameTimer++;
             if (player.frameTimer > player.animationSpeed) {
                 player.frameTimer = 0;
@@ -87,20 +89,42 @@ function update() {
     } else {
         player.isMoving = false;
     }
+
+    // --- Б. Стрельба ---
+    if (player.bulletCooldown > 0) {
+        player.bulletCooldown--;
+    }
+
+    // Space нет в getDirection, берем напрямую из input.keys
+    if (game.input.keys['Space']) {
+        // Ограничения: кулдаун прошел И пуль на экране меньше 1 (или 2, если взял бонус)
+        if (player.bulletCooldown === 0 && bullets.length < 1) {
+            createBullet(player);
+            player.bulletCooldown = 20; // Задержка между выстрелами (~0.3 сек)
+        }
+    }
+
+    // --- В. Обновление пуль ---
+    updateBullets(game.width, game.height);
 }
 
+// 4. Отрисовка
 function draw() {
+    // Очистка
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, game.width, game.height);
 
     if (!game.isLoaded) return;
 
-    // Рисуем уровень
+    // Слой 1: Карта
     if (typeof drawLevel === 'function') {
         drawLevel(ctx, game.sprites, level1);
     }
 
-    // Рисуем игрока
+    // Слой 2: Пули (рисуем ПОД танком или НАД картой)
+    drawBullets(ctx, game.sprites);
+
+    // Слой 3: Игрок
     const dirData = SPRITES.player[player.direction];
     if (dirData) {
         const frame = dirData[player.frameIndex];
@@ -115,5 +139,5 @@ function draw() {
     }
 }
 
-// 3. И только В САМОМ КОНЦЕ запускаем загрузку
+// 5. Запуск загрузки (в самом конце)
 game.sprites.src = './assets/sprites.png';
