@@ -1,7 +1,9 @@
+console.log("Загрузка game.js...");
+
 import { SPRITES, TILE_SIZE } from './sprites.js';
 import { InputHandler } from './input.js';
-// Если ты еще не создал level.js, закомментируй строку ниже и вызов drawLevel в функции draw!
 import { level1, drawLevel } from './level.js'; 
+import { canMoveTo } from './physics.js'; 
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -15,33 +17,37 @@ const game = {
 };
 
 const player = {
-    x: 100,
-    y: 100,
+    x: 0,
+    y: 0,
     speed: 1,
     direction: 'UP',
     isMoving: false,
     frameIndex: 0,
     frameTimer: 0,
-    animationSpeed: 8
+    animationSpeed: 3
 };
 
-game.sprites.src = './assets/sprites.png';
-
+// 1. Сначала определяем функцию ONLOAD
 game.sprites.onload = () => {
-    console.log("Картинка загружена, старт!");
+    console.log("Картинка загружена, старт!"); // <--- Должно появиться!
     game.isLoaded = true;
     requestAnimationFrame(loop);
 };
 
-// Если картинка не найдена, покажет ошибку
+// 2. Обработка ошибок загрузки
 game.sprites.onerror = () => {
-    console.error("ОШИБКА: Не удалось загрузить ./assets/sprites.png");
+    console.error("КРИТИЧЕСКАЯ ОШИБКА: Картинка ./assets/sprites.png не найдена!");
 };
 
 function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+    // Оборачиваем в try-catch, чтобы видеть ошибки внутри цикла
+    try {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    } catch (e) {
+        console.error("ИГРА УПАЛА:", e); // Если тут будет ошибка, мы ее увидим
+    }
 }
 
 function update() {
@@ -51,51 +57,53 @@ function update() {
         player.isMoving = true;
         player.direction = direction;
 
-        if (direction === 'UP') player.y -= player.speed;
-        else if (direction === 'DOWN') player.y += player.speed;
-        else if (direction === 'LEFT') player.x -= player.speed;
-        else if (direction === 'RIGHT') player.x += player.speed;
+        // Физика и Движение
+        let nextX = player.x;
+        let nextY = player.y;
 
-        // Анимация
-        player.frameTimer++;
-        if (player.frameTimer > player.animationSpeed) {
-            player.frameTimer = 0;
-            // Переключаем 0 -> 1 -> 0
-            player.frameIndex = (player.frameIndex === 0) ? 1 : 0;
+        if (direction === 'UP') nextY -= player.speed;
+        else if (direction === 'DOWN') nextY += player.speed;
+        else if (direction === 'LEFT') nextX -= player.speed;
+        else if (direction === 'RIGHT') nextX += player.speed;
+
+        // Проверка коллизий
+        const isInsideMap = 
+            nextX >= 0 && 
+            nextY >= 0 && 
+            nextX <= game.width - TILE_SIZE && 
+            nextY <= game.height - TILE_SIZE;
+
+        if (isInsideMap && canMoveTo(nextX, nextY)) {
+            player.x = nextX;
+            player.y = nextY;
+
+            // Анимация
+            player.frameTimer++;
+            if (player.frameTimer > player.animationSpeed) {
+                player.frameTimer = 0;
+                player.frameIndex = (player.frameIndex === 0) ? 1 : 0;
+            }
         }
     } else {
         player.isMoving = false;
-        // Если хочешь, чтобы гусеницы замирали, когда стоишь:
-        // player.frameIndex = 0; 
     }
-
-    // Границы
-    if (player.x < 0) player.x = 0;
-    if (player.y < 0) player.y = 0;
-    if (player.x > game.width - TILE_SIZE) player.x = game.width - TILE_SIZE;
-    if (player.y > game.height - TILE_SIZE) player.y = game.height - TILE_SIZE;
 }
 
 function draw() {
-    // 1. Очистка
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, game.width, game.height);
 
     if (!game.isLoaded) return;
 
-    // 2. Рисуем карту (если есть level.js)
+    // Рисуем уровень
     if (typeof drawLevel === 'function') {
         drawLevel(ctx, game.sprites, level1);
     }
 
-    // 3. Рисуем игрока
+    // Рисуем игрока
     const dirData = SPRITES.player[player.direction];
-    
-    // Защита от ошибок (если вдруг направление кривое)
     if (dirData) {
-        // Берем кадр по индексу
         const frame = dirData[player.frameIndex];
-        
         if (frame) {
             const [sx, sy, sWidth, sHeight] = frame;
             ctx.drawImage(
@@ -106,3 +114,6 @@ function draw() {
         }
     }
 }
+
+// 3. И только В САМОМ КОНЦЕ запускаем загрузку
+game.sprites.src = './assets/sprites.png';
