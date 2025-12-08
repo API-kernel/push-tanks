@@ -1,41 +1,49 @@
 import { TILE_SIZE } from './sprites.js';
 import { level1 } from './level.js';
 
-console.log("DEBUG PHYSICS: TILE_SIZE =", TILE_SIZE);
-console.log("DEBUG PHYSICS: level1 =", level1); // <-- Должен вывести массив, а не undefined
-
-const SOLID_BLOCKS = [1, 2, 4];
+function checkRectIntersection(r1, r2) {
+    return (
+        r1.x < r2.x + r2.w &&
+        r1.x + r1.w > r2.x &&
+        r1.y < r2.y + r2.h &&
+        r1.y + r1.h > r2.y
+    );
+}
 
 export function canMoveTo(newX, newY) {
-    // 1. ЗАЩИТА: Если карта не загрузилась, разрешаем двигаться, чтобы игра не висла
-    if (!level1 || !TILE_SIZE) {
-        console.error("ОШИБКА: Физика не работает, нет карты или размеров!");
-        return true; 
-    }
+    if (!level1) return true;
 
-    const pad = 2;
-    const points = [
-        { x: newX + pad, y: newY + pad },
-        { x: newX + TILE_SIZE - pad, y: newY + pad },
-        { x: newX + pad, y: newY + TILE_SIZE - pad },
-        { x: newX + TILE_SIZE - pad, y: newY + TILE_SIZE - pad }
-    ];
+    // Танк 14x14
+    const tankRect = { x: newX + 1, y: newY + 1, w: TILE_SIZE - 2, h: TILE_SIZE - 2 };
 
-    for (const point of points) {
-        const col = Math.floor(point.x / TILE_SIZE);
-        const row = Math.floor(point.y / TILE_SIZE);
+    const startCol = Math.floor(tankRect.x / TILE_SIZE);
+    const endCol   = Math.floor((tankRect.x + tankRect.w) / TILE_SIZE);
+    const startRow = Math.floor(tankRect.y / TILE_SIZE);
+    const endRow   = Math.floor((tankRect.y + tankRect.h) / TILE_SIZE);
+    const subSize = 4;
 
-        // 2. Проверка границ массива
-        if (row < 0 || row >= level1.length || col < 0 || col >= level1[0].length) {
-            continue; 
+    for (let row = startRow; row <= endRow; row++) {
+        for (let col = startCol; col <= endCol; col++) {
+            if (row < 0 || row >= level1.length || col < 0 || col >= level1[0].length) continue;
+            const cell = level1[row][col];
+            if (cell === 0 || cell === 3 || cell === 5) continue;
+            const blockX = col * TILE_SIZE;
+            const blockY = row * TILE_SIZE;
+
+            if (typeof cell === 'object') {
+                if (cell.mask === 0) continue;
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        if ((cell.mask & (1 << (r * 4 + c))) !== 0) {
+                            const subRect = { x: blockX + c * subSize, y: blockY + r * subSize, w: subSize, h: subSize };
+                            if (checkRectIntersection(tankRect, subRect)) return false;
+                        }
+                    }
+                }
+            } else if (cell === 4) {
+                if (checkRectIntersection(tankRect, { x: blockX, y: blockY, w: 16, h: 16 })) return false;
+            }
         }
-
-        const tileType = level1[row][col];
-
-        if (SOLID_BLOCKS.includes(tileType)) {
-            return false; // Стена
-        }
     }
-
     return true;
 }

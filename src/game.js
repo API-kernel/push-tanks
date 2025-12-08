@@ -2,7 +2,7 @@ console.log("Загрузка game.js...");
 
 import { SPRITES, TILE_SIZE } from './sprites.js';
 import { InputHandler } from './input.js';
-import { level1, drawLevel } from './level.js'; 
+import { level1, drawLevel, initLevel } from './level.js';
 import { canMoveTo } from './physics.js'; 
 import { createBullet, updateBullets, drawBullets, bullets } from './bullet.js';
 
@@ -26,10 +26,10 @@ const player = {
     frameIndex: 0,
     frameTimer: 0,
     animationSpeed: 8,
-    bulletCooldown: 0 // Таймер для стрельбы
+    bulletCooldown: 0,
+    level: 1 // <--- НОВОЕ: Уровень танка (1 - слабый, 4 - ломает бетон)
 };
 
-// 1. Сначала определяем обработчики событий
 game.sprites.onload = () => {
     console.log("Картинка загружена, старт!");
     game.isLoaded = true;
@@ -40,7 +40,13 @@ game.sprites.onerror = () => {
     console.error("КРИТИЧЕСКАЯ ОШИБКА: Картинка ./assets/sprites.png не найдена!");
 };
 
-// 2. Игровой цикл
+game.sprites.onload = () => {
+    console.log("Картинка загружена, старт!");
+    initLevel();
+    game.isLoaded = true;
+    requestAnimationFrame(loop);
+};
+
 function loop() {
     try {
         update();
@@ -51,9 +57,15 @@ function loop() {
     }
 }
 
-// 3. Обновление логики
 function update() {
-    // --- А. Движение Игрока ---
+    // --- ЧИТЫ (Для теста уровней) ---
+    // Нажимай цифры на клавиатуре, чтобы менять прокачку
+    if (game.input.keys['Digit1']) { player.level = 1; console.log("Lvl 1: Basic"); }
+    if (game.input.keys['Digit2']) { player.level = 2; console.log("Lvl 2: Speed"); }
+    if (game.input.keys['Digit3']) { player.level = 3; console.log("Lvl 3: Double Shot"); }
+    if (game.input.keys['Digit4']) { player.level = 4; console.log("Lvl 4: Concrete"); }
+
+    // --- Движение ---
     const direction = game.input.getDirection();
 
     if (direction) {
@@ -68,7 +80,6 @@ function update() {
         else if (direction === 'LEFT') nextX -= player.speed;
         else if (direction === 'RIGHT') nextX += player.speed;
 
-        // Физика
         const isInsideMap = 
             nextX >= 0 && 
             nextY >= 0 && 
@@ -79,7 +90,6 @@ function update() {
             player.x = nextX;
             player.y = nextY;
 
-            // Анимация гусениц
             player.frameTimer++;
             if (player.frameTimer > player.animationSpeed) {
                 player.frameTimer = 0;
@@ -90,41 +100,39 @@ function update() {
         player.isMoving = false;
     }
 
-    // --- Б. Стрельба ---
+    // --- Стрельба ---
     if (player.bulletCooldown > 0) {
         player.bulletCooldown--;
     }
 
-    // Space нет в getDirection, берем напрямую из input.keys
     if (game.input.keys['Space']) {
-        // Ограничения: кулдаун прошел И пуль на экране меньше 1 (или 2, если взял бонус)
-        if (player.bulletCooldown === 0 && bullets.length < 1) {
+        // Определяем макс. кол-во пуль
+        // Если уровень >= 3, можно 2 пули. Иначе 1.
+        const maxBullets = (player.level >= 3) ? 2 : 1;
+
+        if (player.bulletCooldown === 0 && bullets.length < maxBullets) {
             createBullet(player);
-            player.bulletCooldown = 20; // Задержка между выстрелами (~0.3 сек)
+            // Если быстрые пули (Lvl 2+), стреляем чуть чаще (15 кадров), иначе медленнее (25)
+            player.bulletCooldown = (player.level >= 2) ? 15 : 25; 
         }
     }
 
-    // --- В. Обновление пуль ---
     updateBullets(game.width, game.height);
 }
 
-// 4. Отрисовка
 function draw() {
-    // Очистка
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, game.width, game.height);
 
     if (!game.isLoaded) return;
 
-    // Слой 1: Карта
     if (typeof drawLevel === 'function') {
         drawLevel(ctx, game.sprites, level1);
     }
 
-    // Слой 2: Пули (рисуем ПОД танком или НАД картой)
     drawBullets(ctx, game.sprites);
 
-    // Слой 3: Игрок
+    // В будущем тут можно менять спрайт танка в зависимости от player.level
     const dirData = SPRITES.player[player.direction];
     if (dirData) {
         const frame = dirData[player.frameIndex];
@@ -139,5 +147,4 @@ function draw() {
     }
 }
 
-// 5. Запуск загрузки (в самом конце)
 game.sprites.src = './assets/sprites.png';
