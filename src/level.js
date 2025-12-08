@@ -79,47 +79,60 @@ export function initLevel() {
 }
 
 // Добавь аргумент `gameTime` (мы будем передавать Date.now())
-export function drawLevel(ctx, spritesImage, levelMap, gameTime) {
+// Основной слой (Под танками)
+export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
     if (!levelMap) return;
-
-    // Вычисляем кадр воды (меняется раз в 1000мс)
-    const waterFrameIndex = Math.floor(gameTime / 1000) % 2;
+    const waterFrame = Math.floor(gameTime / 1000) % 2;
 
     for (let row = 0; row < levelMap.length; row++) {
         for (let col = 0; col < levelMap[row].length; col++) {
             const block = levelMap[row][col];
             
+            // Если это ЛЕС (3) - пропускаем! Рисуем потом.
+            if (block === 3) continue;
+
             if (typeof block === 'object') {
-                // ... (код отрисовки разрушаемых стен БЕЗ ИЗМЕНЕНИЙ) ...
-                // Скопируй старый код для block.mask
+                // ... (код отрисовки стен тот же) ...
                 const baseSprite = SPRITES.blocks[block.type]; 
                 if (!baseSprite) continue;
                 const [bx, by] = baseSprite;
                 const subSize = 4;
                 for (let r = 0; r < 4; r++) {
                     for (let c = 0; c < 4; c++) {
-                        const bitIndex = r * 4 + c;
-                        if ((block.mask & (1 << bitIndex)) !== 0) {
+                        if ((block.mask & (1 << (r * 4 + c))) !== 0) {
                             ctx.drawImage(spritesImage, bx + c * subSize, by + r * subSize, subSize, subSize, col * 16 + c * subSize, row * 16 + r * subSize, subSize, subSize);
                         }
                     }
                 }
             } else {
-                // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Анимация воды ---
-                if (block === 4) {
-                    // Берем нужный кадр из массива
+                if (block === 4) { // Вода
                     const frames = SPRITES.blocks[4]; 
-                    const [sx, sy, sw, sh] = frames[waterFrameIndex];
+                    const [sx, sy, sw, sh] = frames[waterFrame];
                     ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                 } 
-                else {
-                    // Обычные блоки (лес, лед)
+                else if (block !== 0) { // Лед (5) и прочее
                     const spriteCoords = SPRITES.blocks[block];
                     if (spriteCoords) {
                         const [sx, sy, sw, sh] = spriteCoords;
                         ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     }
                 }
+            }
+        }
+    }
+}
+
+// Верхний слой (Над танками)
+export function drawForest(ctx, spritesImage, levelMap) {
+    if (!levelMap) return;
+    const forestSprite = SPRITES.blocks[3]; // Лес
+
+    for (let row = 0; row < levelMap.length; row++) {
+        for (let col = 0; col < levelMap[row].length; col++) {
+            const block = levelMap[row][col];
+            if (block === 3) { // Рисуем только лес
+                const [sx, sy, sw, sh] = forestSprite;
+                ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }
         }
     }

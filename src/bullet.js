@@ -1,23 +1,33 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
 import { level1 } from './level.js';
 import { createExplosion, EXPLOSION_SMALL } from './explosion.js'; // <--- Импорт
+import { checkRectOverlap, drawRotated } from './utils.js';
 
 export const bullets = [];
 
-export function createBullet(player) {
-    let x = player.x + TILE_SIZE / 2;
-    let y = player.y + TILE_SIZE / 2;
+export function createBullet(shooter) {
+    // shooter - это или объект player, или объект enemy
+    let x = shooter.x + TILE_SIZE / 2;
+    let y = shooter.y + TILE_SIZE / 2;
 
-    if (player.direction === 'UP') { y -= 8; x -= 2; }
-    else if (player.direction === 'DOWN') { y += 8; x -= 2; }
-    else if (player.direction === 'LEFT') { x -= 8; y -= 2; }
-    else if (player.direction === 'RIGHT') { x += 8; y -= 2; }
+    if (shooter.direction === 'UP') { y -= 8; x -= 2; }
+    else if (shooter.direction === 'DOWN') { y += 8; x -= 2; }
+    else if (shooter.direction === 'LEFT') { x -= 8; y -= 2; }
+    else if (shooter.direction === 'RIGHT') { x += 8; y -= 2; }
 
-    const speed = (player.level >= 2) ? 5 : 3;
+    const speed = (shooter.level >= 2) ? 5 : 3;
 
     const b = {
-        x, y, direction: player.direction, speed, isDead: false,
-        owner: 'player1', ownerLevel: player.level || 1,
+        x, y, 
+        direction: shooter.direction, 
+        speed, 
+        isDead: false,
+        
+        // ВАЖНО: Сохраняем ID того, кто стрелял
+        ownerId: shooter.id, 
+        team: shooter.team,
+        ownerLevel: shooter.level || 1,
+        
         width: 4, height: 4
     };
 
@@ -214,7 +224,18 @@ function checkCollisionAndDestroy(bullet) {
 
 export function drawBullets(ctx, spritesImage) {
     bullets.forEach(b => {
-        const [sx, sy, w, h] = SPRITES.bullet[b.direction];
-        ctx.drawImage(spritesImage, sx, sy, w, h, b.x, b.y, w, h);
+        // 1. Берем спрайт для конкретного направления
+        const spriteData = SPRITES.bullet[b.direction];
+        
+        if (spriteData) {
+            const [sx, sy, w, h] = spriteData;
+            
+            // 2. Центрируем спрайт внутри хитбокса пули (который 4x4)
+            // Math.floor важен, чтобы не попасть в полупиксели (избегаем мыла)
+            const dx = Math.floor(b.x + (b.width - w) / 2);
+            const dy = Math.floor(b.y + (b.height - h) / 2);
+
+            ctx.drawImage(spritesImage, sx, sy, w, h, dx, dy, w, h);
+        }
     });
 }

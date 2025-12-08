@@ -1,24 +1,34 @@
 export const TILE_SIZE = 16;
 
 export const SPRITES = {
-    player: {
-        UP: [
-            [0 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE],
-            [1 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE]
-        ],
-        LEFT: [
-            [2 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE],
-            [3 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE]
-        ],
-        DOWN: [
-            [4 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE],
-            [5 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE]
-        ],
-        RIGHT: [
-            [6 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE],
-            [7 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE]
-        ]
+    // Игрок: храним только 2 кадра (движение гусениц), смотрящих ВВЕРХ
+    player: [
+        [0 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE],
+        [1 * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE]
+    ],
+
+    // Враги: аналогично, только кадры UP
+    enemy_basic: [
+        [8 * 16, 4 * 16, 16, 16], 
+        [9 * 16, 4 * 16, 16, 16]
+    ],
+    enemy_fast: [
+        [8 * 16, 5 * 16, 16, 16], 
+        [9 * 16, 5 * 16, 16, 16]
+    ],
+    enemy_armor: [
+        [8 * 16, 7 * 16, 16, 16], 
+        [9 * 16, 7 * 16, 16, 16]
+    ],
+
+    bullet: {
+        UP:    [323, 102, 3, 4],
+        DOWN:  [339, 102, 3, 4],
+        LEFT:  [330, 102, 4, 3],
+        RIGHT: [346, 102, 4, 3]
     },
+
+    // Блоки и остальное оставляем как есть...
     blocks: {
         0: null, 
         1: [256, 0,  16, 16], // Кирпич
@@ -31,26 +41,18 @@ export const SPRITES = {
         5: [288, 32, 16, 16], // Лед
         6: [256 + 8, 0, 8, 16] 
     },
-    bullet: {
-        UP:    [323, 102, 3, 4],
-        DOWN:  [339, 102, 3, 4],
-        LEFT:  [330, 102, 4, 3],
-        RIGHT: [346, 102, 4, 3]
-    },
-    
-    // --- НОВОЕ ---
     base: {
         alive: [304, 32, 16, 16],
         dead:  [320, 32, 16, 16]
     },
+    shield: [
+        [256, 144, 16, 16],
+        [272, 144, 16, 16]
+    ],
     explosion_small: [
-        [256, 128, 16, 16],
-        [272, 128, 16, 16],
-        [288, 128, 16, 16]
+        [256, 128, 16, 16], [272, 128, 16, 16], [288, 128, 16, 16]
     ],
     explosion_big: [
-        [304, 128, 32, 32],
-        [336, 128, 32, 32] 
-        // В оригинале там еще есть кадры, но 2 основных достаточно
+        [304, 128, 32, 32], [336, 128, 32, 32] 
     ]
 };
