@@ -9,9 +9,10 @@ body {
 }
 
 canvas {
-    background-color: #000; /* Черный фон карты, как в оригинале */
-    image-rendering: pixelated; /* ВАЖНО: Сохраняет пиксели четкими при масштабировании */
-    width: 768px; /* 256 * 3 */
-    height: 720px; /* 240 * 3 */
+    width: 816px; 
+    height: 816px; 
+    
+    background-color: #636363; /* Серый цвет рамки */
+    image-rendering: pixelated; /* Обязательно для пиксель-арта */
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }

@@ -1,5 +1,6 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
 import { level1 } from './level.js';
+import { createExplosion, EXPLOSION_SMALL } from './explosion.js'; // <--- Импорт
 
 export const bullets = [];
 
@@ -42,8 +43,13 @@ export function updateBullets(gameWidth, gameHeight) {
             b.x += stepX;
             b.y += stepY;
 
+            // --- ИЗМЕНЕНИЕ: Взрыв об край ---
             if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
                 b.isDead = true;
+                
+                // Рисуем взрыв ровно в точке вылета пули.
+                // Не смещаем координаты вручную, padding канваса позволит увидеть взрыв целиком.
+                createExplosion(b.x, b.y, EXPLOSION_SMALL);
                 break;
             }
 
@@ -61,7 +67,7 @@ function checkRectIntersection(r1, r2) {
 function checkCollisionAndDestroy(bullet) {
     if (bullet.isDead) return true;
 
-    // --- 1. HIT TEST & CONTACT EDGE ---
+    // --- 1. HIT TEST ---
     let hitDetected = false;
     let isSteelHit = false;
     let contactEdge = (bullet.direction === 'UP' || bullet.direction === 'LEFT') ? -Infinity : Infinity;
@@ -109,17 +115,15 @@ function checkCollisionAndDestroy(bullet) {
 
     if (!hitDetected) return false;
 
+    // УДАР! Создаем эффект
+    createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, EXPLOSION_SMALL);
+
     bullet.isDead = true;
     if (isSteelHit && bullet.ownerLevel < 4) return true;
 
-    // --- 2. DAMAGE BOX CALCULATION ---
-
+    // --- 2. DAMAGE BOX ---
     const cx = bullet.x + bullet.width / 2;
     const cy = bullet.y + bullet.height / 2;
-
-    // === КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: АДАПТИВНАЯ ПРИВЯЗКА ===
-    // Если попали в Бетон -> 8px (строгая сетка)
-    // Если попали в Кирпич -> 4px (плавная сетка, соответствующая размеру микро-блоков)
     const lateralSnap = isSteelHit ? 8 : 4;
 
     let snapX = cx;
@@ -159,7 +163,6 @@ function checkCollisionAndDestroy(bullet) {
     }
 
     // --- 3. APPLY DAMAGE ---
-
     const dStartCol = Math.floor(damageRect.x / TILE_SIZE);
     const dEndCol   = Math.floor((damageRect.x + damageRect.w) / TILE_SIZE);
     const dStartRow = Math.floor(damageRect.y / TILE_SIZE);
@@ -177,7 +180,6 @@ function checkCollisionAndDestroy(bullet) {
                     const blockY = row * TILE_SIZE;
 
                     if (block.type === 2) {
-                        // БЕТОН
                         const quadrants = [
                             { bits: [0,1,4,5],     x: blockX,   y: blockY,   w: 8, h: 8 }, 
                             { bits: [2,3,6,7],     x: blockX+8, y: blockY,   w: 8, h: 8 }, 
@@ -190,16 +192,11 @@ function checkCollisionAndDestroy(bullet) {
                             }
                         }
                     } else {
-                        // КИРПИЧ
                         for (let r = 0; r < 4; r++) {
                             for (let c = 0; c < 4; c++) {
                                 const bitIndex = r * 4 + c;
                                 if ((block.mask & (1 << bitIndex)) !== 0) {
-                                    const subRect = {
-                                        x: blockX + c * 4,
-                                        y: blockY + r * 4,
-                                        w: 4, h: 4
-                                    };
+                                    const subRect = { x: blockX + c * 4, y: blockY + r * 4, w: 4, h: 4 };
                                     if (checkRectIntersection(damageRect, subRect)) {
                                         block.mask &= ~(1 << bitIndex);
                                     }
