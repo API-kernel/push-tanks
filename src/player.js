@@ -4,6 +4,7 @@ import { createBullet, bullets } from './bullet.js';
 import { updateTankMovement, drawTank } from './tank.js'; 
 import { TANK_STATS } from './config.js'; 
 import { teamManager } from './team_manager.js';
+import { audio } from './audio.js';
 
 // Приоритет колонок для спавна игроков: P1->4, P2->8, P3->0, P4->12
 const SPAWN_PRIORITY = [4, 8, 0, 12];
@@ -95,6 +96,10 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
         } else {
             p.isMoving = false;
         }
+                    
+        if (!p.isSpawning) {
+            audio.updateEngine(p.id, p.isMoving);
+        }
 
         // 4. СТРЕЛЬБА
         if (p.bulletCooldown > 0) p.bulletCooldown--;
@@ -105,6 +110,7 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
             
             if (p.bulletCooldown === 0 && myBullets < maxBullets) {
                 createBullet(p);
+                audio.play('fire');
                 p.bulletCooldown = (p.level >= 2) ? 15 : 25; 
             }
         }

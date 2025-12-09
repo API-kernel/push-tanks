@@ -1,6 +1,8 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
 import { level1 } from './level.js';
 import { createExplosion, EXPLOSION_SMALL } from './explosion.js';
+import { audio } from './audio.js';
+import { players } from './player.js';
 
 export const bullets = [];
 
@@ -59,6 +61,10 @@ export function updateBullets(gameWidth, gameHeight) {
                 // Рисуем взрыв ровно в точке вылета пули.
                 // Не смещаем координаты вручную, padding канваса позволит увидеть взрыв целиком.
                 createExplosion(b.x, b.y, EXPLOSION_SMALL);
+
+                if (players.some(p => p.id === b.ownerId)) {
+                    audio.play('miss_hit');
+                }
                 break;
             }
 
@@ -123,6 +129,23 @@ function checkCollisionAndDestroy(bullet) {
     }
 
     if (!hitDetected) return false;
+
+    // ЗВУК УДАРА (Только если владелец пули - локальный игрок)
+    // Ищем, есть ли такой ID в массиве players
+    const isLocalPlayer = players.some(p => p.id === bullet.ownerId);
+    
+    if (isLocalPlayer) {
+        if (isSteelHit) {
+            if (bullet.ownerLevel < 4) {
+                audio.play('miss_hit');
+            } else {
+                audio.play('concrete_hit'); // Или wall_hit, звук разрушения
+            }
+        } 
+        else {
+            audio.play('brick_hit');
+        }
+    }
 
     // --- НОВАЯ ЛОГИКА: ЗАЩИТА БАЗЫ ОТ БОТОВ ---
     // Если стрелял БОТ (ownerId >= 1000), проверяем, не попал ли он в защиту СВОЕЙ базы.

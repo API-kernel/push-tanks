@@ -10,6 +10,7 @@ import { updatePlayers, drawPlayers, startPlayerSpawn, players } from './player.
 import { checkRectOverlap } from './utils.js'; 
 import { teamManager } from './team_manager.js'; 
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING } from './config.js';
+import { audio } from './audio.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -58,6 +59,7 @@ game.sprites.onload = () => {
     players.forEach(p => startPlayerSpawn(p));
     game.isLoaded = true;
     requestAnimationFrame(loop);
+    // audio.play('intro'); 
 };
 
 game.sprites.onerror = () => { console.error("Error loading sprites"); };
@@ -136,7 +138,12 @@ function update() {
                 if (team.name === 'GREEN') console.log("GREEN TEAM LOST"); 
                 else console.log("RED TEAM LOST");
                 
+                audio.play('base_crash'); // <--- БАЗА
+                
                 gameState.isGameOver = true;
+                
+                audio.play('game_over'); // <--- КОНЕЦ
+                audio.stopAll();
             }
         });
 
@@ -148,6 +155,7 @@ function update() {
                     
                     if (tank.shieldTimer > 0) {
                         createExplosion(tank.x + 8, tank.y + 8, 'SMALL');
+                        audio.play('explosion');
                         break; 
                     }
 
@@ -162,12 +170,18 @@ function update() {
 
                     if (isDead) {
                         createExplosion(tank.x + 8, tank.y + 8, EXPLOSION_BIG);
+                        
                         if (players.includes(tank)) {
-                            console.log(`PLAYER ${tank.id} DIED`);
-                            startPlayerSpawn(tank); 
+                            console.log("PLAYER DIED");
+                            audio.play('explosion_player'); // <--- Смерть игрока
+                            startPlayerSpawn(tank);
+                        } else {
+                            audio.play('explosion_bot'); // <--- Смерть бота
                         }
                     } else {
+                        // Попали, но не убили (Броня)
                         createExplosion(tank.x + 8, tank.y + 8, 'SMALL'); 
+                        audio.play('armor_hit'); // <--- Звук брони
                     }
                     break; 
                 }
