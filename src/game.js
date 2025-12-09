@@ -11,6 +11,8 @@ import { checkRectOverlap } from './utils.js';
 import { teamManager } from './team_manager.js'; 
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING } from './config.js';
 import { audio } from './audio.js';
+import { spawnBonus, drawBonuses, checkBonusCollection, activeBonus } from './bonus.js';
+import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS } from './config.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -74,6 +76,11 @@ function loop() {
     }
 }
 
+const effectTimers = {
+    shovel: 0,
+    clock: 0
+};
+
 // --- ОБНОВЛЕНИЕ ---
 function update() {
     if (gameState.isGameOver) { updateExplosions(); return; }
@@ -96,7 +103,7 @@ function update() {
     });
     
     // ВЫЗОВ: 5 аргументов
-    updateEnemies(game.width, game.height, checkGlobalCollision, playerCounts, allEntities);
+    updateEnemies(game.width, game.height, checkGlobalCollision, playerCounts, allEntities, effectTimers.clock > 0 ? effectTimers.clockTeam : null);
 
     // 3. ПУЛИ
     updateBullets(game.width, game.height);
@@ -188,6 +195,35 @@ function update() {
             }
         }
     });
+
+    // --- БОНУСЫ (Проверка подбора) ---
+    // Проверяем каждого игрока
+    players.forEach(p => {
+        if (p.isSpawning) return;
+        
+        const bonusType = checkBonusCollection(p);
+        if (bonusType) {
+            applyBonus(p, bonusType);
+        }
+    });
+
+    // Часы
+    if (effectTimers.clock > 0) effectTimers.clock--;
+    
+    // Лопата
+    if (effectTimers.shovel > 0) {
+        effectTimers.shovel--;
+        if (effectTimers.shovel === 0) {
+            teamManager.fortifyBase(effectTimers.shovelTeam, false); 
+        }
+    }
+
+    // ЧИТ (0)
+    if (game.input.keys['Digit0']) {
+        game.input.keys['Digit0'] = false; // Сброс нажатия (чтобы не спамить)
+        // Спавн перед игроком
+        spawnBonus(players[0].x, players[0].y - 32); 
+    }
 }
 
 // --- ОТРИСОВКА ---
@@ -215,6 +251,7 @@ function draw() {
     drawEnemies(ctx, game.sprites);
     drawPlayers(ctx, game.sprites);
     drawExplosions(ctx, game.sprites);
+    drawBonuses(ctx, game.sprites); 
 
     if (typeof drawForest === 'function') drawForest(ctx, game.sprites, level1); 
 
@@ -226,6 +263,56 @@ function draw() {
     }
 
     ctx.restore();
+}
+
+function applyBonus(player, type) {
+    console.log("APPLY BONUS:", type);
+    
+    switch (type) {
+        case 'helmet':
+            player.shieldTimer = HELMET_DURATION;
+            break;
+            
+        case 'clock':
+            effectTimers.clock = CLOCK_DURATION;
+            effectTimers.clockTeam = player.team; // Кто взял часы
+            break;
+            
+        case 'shovel':
+            effectTimers.shovel = SHOVEL_DURATION;
+            // Укрепляем базу ТОЙ команды, которая взяла бонус
+            teamManager.fortifyBase(player.team, true); 
+            
+            // Запоминаем, чью базу укрепляли, чтобы потом вернуть кирпич ИМЕННО ЕЙ
+            effectTimers.shovelTeam = player.team; 
+            break;
+            
+        case 'star':
+            player.level++;
+            if (player.level > 4) player.level = 4;
+            break;
+            
+        case 'gun':
+            player.level = 4;
+            // + Логика кошения травы (потом)
+            break;
+            
+        case 'grenade':
+            // Взрываем всех врагов (Чужая команда)
+            enemies.forEach(e => {
+                if (e.team !== player.team) {
+                    e.hp = 0;
+                    hitEnemy(enemies.indexOf(e)); // Убьет и запустит взрыв
+                    createExplosion(e.x+8, e.y+8, 'BIG');
+                }
+            });
+            break;
+            
+        case 'tank':
+            // +1 Жизнь (пока просто звук)
+            // audio.play('life_up');
+            break;
+    }
 }
 
 game.sprites.src = './assets/sprites.png';

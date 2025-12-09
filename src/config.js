@@ -41,3 +41,43 @@ export const TANK_STATS = {
     fast:   { speed: 1.2, hp: 1, bulletSpeed: 3 },
     armor:  { speed: 0.4, hp: 4, bulletSpeed: 5 }
 };
+
+export const BONUS_WEIGHTS = {
+    'star': 20,
+    'grenade': 10,
+    'clock': 20,
+    'helmet': 14,
+    'tank': 10,
+    'gun': 1,
+    'shovel': 25
+};
+
+// Длительность эффектов (в кадрах, 60 FPS)
+export const HELMET_DURATION = 300;  // 5 сек
+export const SHOVEL_DURATION = 900;  // 15 сек
+export const CLOCK_DURATION  = 600;  // 10 сек (стандарт)
+
+export const WALL_MASKS = {
+    LEFT:   0x3333,
+    RIGHT:  0xCCCC,
+    TOP:    0x00FF,
+    BOTTOM: 0xFF00,
+    FULL:   0xFFFF
+};
+
+export const BASE_WALLS = {
+    [1]: [ // GREEN (Низ)
+        { r: 12, c: 5, mask: WALL_MASKS.RIGHT },
+        { r: 11, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.BOTTOM }, // Угол
+        { r: 11, c: 6, mask: WALL_MASKS.BOTTOM },
+        { r: 11, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.BOTTOM },  // Угол
+        { r: 12, c: 7, mask: WALL_MASKS.LEFT }
+    ],
+    [2]: [ // RED (Верх)
+        { r: 0, c: 5, mask: WALL_MASKS.RIGHT },
+        { r: 1, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.TOP },
+        { r: 1, c: 6, mask: WALL_MASKS.TOP },
+        { r: 1, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.TOP },
+        { r: 0, c: 7, mask: WALL_MASKS.LEFT }
+    ]
+};

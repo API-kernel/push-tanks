@@ -1,4 +1,5 @@
 import { SPRITES, TILE_SIZE } from './sprites.js';
+import { TEAMS_CONFIG, BASE_WALLS } from './config.js';
 
 // Карту не меняем, она та же
 const rawLevel1 = [
@@ -20,7 +21,6 @@ const rawLevel1 = [
 export let level1 = [];
 
 export function initLevel() {
-    // 1. Копируем карту
     level1 = rawLevel1.map(row => row.map(cell => {
         if (cell === 1 || cell === 2) {
             return { type: cell, mask: 0xFFFF }; 
@@ -28,54 +28,17 @@ export function initLevel() {
         return cell;
     }));
 
-    // 2. --- ФОРТИФИКАЦИЯ БАЗЫ ---
-    
-    // Базовые половинки
-    const LEFT_HALF   = 0x3333; // 0011...
-    const RIGHT_HALF  = 0xCCCC; // 1100...
-    const TOP_HALF    = 0x00FF; // Верхние 2 линии
-    const BOTTOM_HALF = 0xFF00; // Нижние 2 линии
-
-    const setWall = (r, c, mask) => {
-        if (r >= 0 && r < level1.length && c >= 0 && c < level1[0].length) {
-            level1[r][c] = { type: 1, mask: mask };
+    // Применяем стены баз из конфига
+    TEAMS_CONFIG.forEach(team => {
+        const walls = BASE_WALLS[team.id];
+        if (walls) {
+            walls.forEach(w => {
+                if (level1[w.r] && level1[w.r][w.c] !== undefined) {
+                    level1[w.r][w.c] = { type: 1, mask: w.mask };
+                }
+            });
         }
-    };
-
-    // === НИЖНЯЯ БАЗА (Орел на 12, 6) ===
-    
-    // 1. Левая колонна (12, 5) -> Правая часть
-    setWall(12, 5, RIGHT_HALF);
-    
-    // 2. Левый верхний угол (11, 5) -> Правая часть + Нижняя часть (Уголок)
-    setWall(11, 5, RIGHT_HALF & BOTTOM_HALF);
-    
-    // 3. Крыша (11, 6) -> Нижняя часть
-    setWall(11, 6, BOTTOM_HALF); 
-
-    // 4. Правый верхний угол (11, 7) -> Левая часть + Нижняя часть
-    setWall(11, 7, LEFT_HALF & BOTTOM_HALF);
-
-    // 5. Правая колонна (12, 7) -> Левая часть
-    setWall(12, 7, LEFT_HALF);
-
-
-    // === ВЕРХНЯЯ БАЗА (Орел на 0, 6) ===
-    
-    // 1. Левая колонна (0, 5) -> Правая часть
-    setWall(0, 5, RIGHT_HALF);
-
-    // 2. Левый нижний угол (1, 5) -> Правая часть + Верхняя часть
-    setWall(1, 5, RIGHT_HALF & TOP_HALF);
-
-    // 3. Пол (1, 6) -> Верхняя часть
-    setWall(1, 6, TOP_HALF);
-
-    // 4. Правый нижний угол (1, 7) -> Левая часть + Верхняя часть
-    setWall(1, 7, LEFT_HALF & TOP_HALF);
-
-    // 5. Правая колонна (0, 7) -> Левая часть
-    setWall(0, 7, LEFT_HALF);
+    });
 }
 
 // Добавь аргумент `gameTime` (мы будем передавать Date.now())

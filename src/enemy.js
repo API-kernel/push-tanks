@@ -33,7 +33,7 @@ export function hitEnemy(index) {
 }
 
 // СИГНАТУРА: 5 АРГУМЕНТОВ
-export function updateEnemies(gameWidth, gameHeight, onCheckCollision, playerCounts, allTanks) {
+export function updateEnemies(gameWidth, gameHeight, onCheckCollision, playerCounts, allTanks, clockActiveTeam) {
     
     // 1. СПАВН (Проходим по командам из Менеджера)
     const teams = teamManager.getTeams();
@@ -80,6 +80,8 @@ export function updateEnemies(gameWidth, gameHeight, onCheckCollision, playerCou
     // 3. ОБНОВЛЕНИЕ ВРАГОВ
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
+
+        if (clockActiveTeam && enemy.team !== clockActiveTeam) continue;
 
         if (!enemy.isMoving || Math.random() < 0.005) {
             changeDirection(enemy);

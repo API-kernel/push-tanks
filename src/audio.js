@@ -10,6 +10,9 @@ const SOUNDS = {
     armor_hit:        './assets/armor_hit.mp3',
     explosion_bot:    './assets/explosion_bot.mp3',
     explosion_player: './assets/explosion_player.mp3',
+    bonus_appear: './assets/bonus_appear.mp3', // (Найди или добавь)
+    bonus_take:   './assets/bonus_take.mp3',   // (Найди или добавь)
+    life_up:      './assets/life_up.mp3',      // (Найди или добавь)
     
     // Для моторов нам нужно будет управлять экземплярами отдельно
     idle:       './assets/idle.mp3',
