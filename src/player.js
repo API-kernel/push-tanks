@@ -1,29 +1,36 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
-import { canMoveTo } from './physics.js';
 import { destroyBlockAt } from './level.js';
 import { createBullet, bullets } from './bullet.js';
-import { drawRotated } from './utils.js'; // Используем нашу утилиту
-import { TEAMS, ACTIVE_TEAMS } from './constants.js';
+import { updateTankMovement, drawTank } from './tank.js'; 
+import { TANK_STATS } from './config.js'; 
+import { teamManager } from './team_manager.js';
 
+// Приоритет колонок для спавна игроков: P1->4, P2->8, P3->0, P4->12
+const SPAWN_PRIORITY = [4, 8, 0, 12];
 
-// МАССИВ ИГРОКОВ
 export const players = [
-    // Игрок 1
+    // Игрок 1 (Зеленый) -> Будет спавниться на 4
     {
-        id: 1, team: TEAMS.GREEN,
-        x: 4 * TILE_SIZE, y: 12 * TILE_SIZE,
-        speed: 1, direction: 'UP', isMoving: false, 
-        frameIndex: 0, frameTimer: 0, animationSpeed: 8, bulletCooldown: 0, level: 1,
+        id: 1, team: 1,
+        x: 0, y: 0, // Задастся при спавне
+        speed: TANK_STATS.player.speed, 
+        hp: TANK_STATS.player.hp,
+        direction: 'UP', isMoving: false, 
+        frameIndex: 0, frameTimer: 0, 
+        bulletCooldown: 0, level: 1,
         shieldTimer: 0, 
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
-        keys: { fire: 'Space' } // Остальное управление берем глобально пока
+        keys: { fire: 'Space' } 
     },
-    // Игрок 2 (Манекен для тестов)
+    // Игрок 2 (Зеленый, Манекен) -> Будет спавниться на 8
     {
-        id: 2, team: TEAMS.GREEN,
-        x: 8 * TILE_SIZE, y: 12 * TILE_SIZE,
-        speed: 1, direction: 'UP', isMoving: false, 
-        frameIndex: 0, frameTimer: 0, animationSpeed: 8, bulletCooldown: 0, level: 1,
+        id: 2, team: 1,
+        x: 0, y: 0,
+        speed: TANK_STATS.player.speed,
+        hp: TANK_STATS.player.hp,
+        direction: 'UP', isMoving: false, 
+        frameIndex: 0, frameTimer: 0, 
+        bulletCooldown: 0, level: 1,
         shieldTimer: 0,
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
         keys: { fire: 'Enter' } 
@@ -33,7 +40,32 @@ export const players = [
 export function startPlayerSpawn(p) {
     p.isSpawning = true;
     p.spawnTimer = 0;
-    // Можно добавить рандомный выбор точки спавна (0, 6, 12), но пока оставим как в конфиге
+    p.shieldTimer = 0;
+    p.level = 1; 
+    
+    // --- ЖЕСТКИЙ РАСЧЕТ ПОЗИЦИИ ---
+    
+    // 1. Выбираем колонку на основе ID
+    // (ID 1 -> index 0 -> col 4)
+    // (ID 2 -> index 1 -> col 8)
+    const colIndex = (p.id - 1) % SPAWN_PRIORITY.length;
+    const col = SPAWN_PRIORITY[colIndex];
+
+    // 2. Выбираем ряд (Y) на основе команды
+    // Спрашиваем у менеджера, где спавнится эта команда (верх или низ)
+    const teamConfig = teamManager.getTeam(p.team);
+    const spawnY = teamConfig ? teamConfig.spawnPixelY : 12 * TILE_SIZE;
+    
+    // 3. Устанавливаем координаты
+    p.x = col * TILE_SIZE;
+    p.y = spawnY;
+
+    // 4. Устанавливаем направление
+    if (teamConfig) {
+        p.direction = teamConfig.direction;
+    }
+
+    // 5. Чистим место (стены, лес, воду)
     destroyBlockAt(p.x, p.y);
 }
 
@@ -53,36 +85,13 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
         // 2. ЩИТ
         if (p.shieldTimer > 0) p.shieldTimer--;
 
-        // 3. УПРАВЛЕНИЕ И ДВИЖЕНИЕ
-        // (Пока управляем только ID=1 через стрелки)
+        // 3. ДВИЖЕНИЕ
         let direction = null;
-        if (p.id === 1) direction = input.getDirection();
+        // Управление пока только для P1
+        if (p.id === 1) direction = input.getDirection(); 
 
         if (direction) {
-            p.isMoving = true;
-            p.direction = direction;
-            let nextX = p.x;
-            let nextY = p.y;
-
-            if (direction === 'UP') nextY -= p.speed;
-            else if (direction === 'DOWN') nextY += p.speed;
-            else if (direction === 'LEFT') nextX -= p.speed;
-            else if (direction === 'RIGHT') nextX += p.speed;
-
-            const isInsideMap = 
-                nextX >= 0 && nextY >= 0 && 
-                nextX <= gameWidth - TILE_SIZE && nextY <= gameHeight - TILE_SIZE;
-
-            // onCheckCollision - это checkGlobalCollision из game.js
-            if (isInsideMap && canMoveTo(nextX, nextY) && !onCheckCollision(nextX, nextY, p.x, p.y, p.id)) {
-                p.x = nextX;
-                p.y = nextY;
-                p.frameTimer++;
-                if (p.frameTimer > p.animationSpeed) {
-                    p.frameTimer = 0;
-                    p.frameIndex = (p.frameIndex === 0) ? 1 : 0;
-                }
-            }
+            updateTankMovement(p, direction, gameWidth, gameHeight, onCheckCollision);
         } else {
             p.isMoving = false;
         }
@@ -90,7 +99,6 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
         // 4. СТРЕЛЬБА
         if (p.bulletCooldown > 0) p.bulletCooldown--;
         
-        // Проверяем кнопку стрельбы
         if (p.id === 1 && input.keys[p.keys.fire]) {
             const maxBullets = (p.level >= 3) ? 2 : 1;
             const myBullets = bullets.filter(b => b.ownerId === p.id && !b.isDead).length;
@@ -105,40 +113,14 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
 
 export function drawPlayers(ctx, spritesImage) {
     players.forEach(p => {
-        // Анимация появления
         if (p.isSpawning) {
             const frame = SPRITES.spawn_appear[p.spawnFrameIndex];
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
                 ctx.drawImage(spritesImage, sx, sy, sw, sh, p.x, p.y, TILE_SIZE, TILE_SIZE);
             }
-            return;
-        }
-
-        // Танк
-        const frames = SPRITES.player; // Массив [кадр1, кадр2] (смотрят вверх)
-        if (frames) {
-            const frame = frames[p.frameIndex];
-            if (frame) {
-                const [sx, sy, sw, sh] = frame;
-                // ИСПОЛЬЗУЕМ drawRotated
-                drawRotated(
-                    ctx, spritesImage,
-                    sx, sy, sw, sh,
-                    Math.round(p.x), Math.round(p.y), TILE_SIZE, TILE_SIZE,
-                    p.direction
-                );
-            }
-        }
-
-        // Щит (рисуем обычно, без вращения)
-        if (p.shieldTimer > 0) {
-            const shieldFrameIndex = Math.floor(Date.now() / 50) % 2;
-            const shieldFrame = SPRITES.shield[shieldFrameIndex];
-            if (shieldFrame) {
-                const [sx, sy, sw, sh] = shieldFrame;
-                ctx.drawImage(spritesImage, sx, sy, sw, sh, Math.round(p.x), Math.round(p.y), TILE_SIZE, TILE_SIZE);
-            }
+        } else {
+            drawTank(ctx, spritesImage, p);
         }
     });
 }

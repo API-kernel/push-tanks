@@ -127,27 +127,28 @@ function checkCollisionAndDestroy(bullet) {
     // --- НОВАЯ ЛОГИКА: ЗАЩИТА БАЗЫ ОТ БОТОВ ---
     // Если стрелял БОТ (ownerId >= 1000), проверяем, не попал ли он в защиту СВОЕЙ базы.
     if (bullet.ownerId >= 1000) {
-        // Координаты удара (грубые, по блоку)
-        // Берем первый попавшийся блок из цикла выше (мы знаем, что попали)
-        // Для точности проверим, входит ли пуля в "Запретную зону".
-        
         const bRow = Math.floor(bullet.y / TILE_SIZE);
         const bCol = Math.floor(bullet.x / TILE_SIZE);
-
-        // Зона Красной базы (Верх, Team 2): Ряды 0-1, Колонки 5-7
-        if (bullet.team === 2 && bRow <= 1 && bCol >= 5 && bCol <= 7) {
-            bullet.isDead = true; // Пуля исчезает
-            return true;          // Урона нет
+        if (bullet.team === 2 && bRow <= 2 && bCol >= 5 && bCol <= 7) {
+            bullet.isDead = true; 
+            createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL); // <-- Взрывчик
+            return true; 
         }
-
-        // Зона Зеленой базы (Низ, Team 1): Ряды 11-12, Колонки 5-7
-        if (bullet.team === 1 && bRow >= 11 && bCol >= 5 && bCol <= 7) {
+        if (bullet.team === 1 && bRow >= 10 && bCol >= 5 && bCol <= 7) {
             bullet.isDead = true;
+            createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL); // <-- Взрывчик
             return true;
         }
     }
 
+    // 2. Обычное попадание
     bullet.isDead = true;
+    
+    // РИСУЕМ ВЗРЫВ!
+    // Смещаем к центру пули
+    createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL);
+
+    // Если бетон и слабый танк - выходим (урон не наносим, но взрыв показали)
     if (isSteelHit && bullet.ownerLevel < 4) return true;
 
     // --- 2. DAMAGE BOX ---
