@@ -1,7 +1,6 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
 import { level1 } from './level.js';
-import { createExplosion, EXPLOSION_SMALL } from './explosion.js'; // <--- Импорт
-import { checkRectOverlap, drawRotated } from './utils.js';
+import { createExplosion, EXPLOSION_SMALL } from './explosion.js';
 
 export const bullets = [];
 
@@ -125,8 +124,28 @@ function checkCollisionAndDestroy(bullet) {
 
     if (!hitDetected) return false;
 
-    // УДАР! Создаем эффект
-    createExplosion(bullet.x + bullet.width/2, bullet.y + bullet.height/2, EXPLOSION_SMALL);
+    // --- НОВАЯ ЛОГИКА: ЗАЩИТА БАЗЫ ОТ БОТОВ ---
+    // Если стрелял БОТ (ownerId >= 1000), проверяем, не попал ли он в защиту СВОЕЙ базы.
+    if (bullet.ownerId >= 1000) {
+        // Координаты удара (грубые, по блоку)
+        // Берем первый попавшийся блок из цикла выше (мы знаем, что попали)
+        // Для точности проверим, входит ли пуля в "Запретную зону".
+        
+        const bRow = Math.floor(bullet.y / TILE_SIZE);
+        const bCol = Math.floor(bullet.x / TILE_SIZE);
+
+        // Зона Красной базы (Верх, Team 2): Ряды 0-1, Колонки 5-7
+        if (bullet.team === 2 && bRow <= 1 && bCol >= 5 && bCol <= 7) {
+            bullet.isDead = true; // Пуля исчезает
+            return true;          // Урона нет
+        }
+
+        // Зона Зеленой базы (Низ, Team 1): Ряды 11-12, Колонки 5-7
+        if (bullet.team === 1 && bRow >= 11 && bCol >= 5 && bCol <= 7) {
+            bullet.isDead = true;
+            return true;
+        }
+    }
 
     bullet.isDead = true;
     if (isSteelHit && bullet.ownerLevel < 4) return true;

@@ -1,26 +1,26 @@
 import { TILE_SIZE, SPRITES } from './sprites.js';
 import { canMoveTo } from './physics.js';
 import { createBullet } from './bullet.js';
-import { checkRectOverlap, drawRotated } from './utils.js';
+import { destroyBlockAt } from './level.js';
+import { drawRotated } from './utils.js';
 
 export const enemies = [];
+export const pendingSpawns = [];
 
-const SPAWN_POINTS = [
-    { x: 0 * TILE_SIZE, y: 0 },
-    { x: 6 * TILE_SIZE, y: 0 },
-    { x: 12 * TILE_SIZE, y: 0 }
-];
+// Точки спавна (0, 4, 8, 12 - для ширины 13)
+const SPAWN_COLS = [0, 4, 8, 12];
 
-// --- ОБНОВЛЕННЫЕ КОНСТАНТЫ ---
 const ENEMY_TYPES = [
     { type: 'basic', sprite: 'enemy_basic', speed: 0.5, hp: 1, bulletSpeedLvl: 1 },
-    { type: 'fast',  sprite: 'enemy_fast',  speed: 1.2, hp: 1, bulletSpeedLvl: 1 }, // Быстрый стал 1.2
-    { type: 'armor', sprite: 'enemy_armor', speed: 0.4, hp: 4, bulletSpeedLvl: 2 }  // Броня 0.4
+    { type: 'fast',  sprite: 'enemy_fast',  speed: 1.0, hp: 1, bulletSpeedLvl: 1 },
+    { type: 'armor', sprite: 'enemy_armor', speed: 0.4, hp: 4, bulletSpeedLvl: 2 }
 ];
 
-let spawnTimer = 0;
+// Хранилище таймеров спавна для каждой команды: { 1: 0, 2: 0 ... }
+const teamSpawnTimers = {};
+
 const SPAWN_DELAY = 120; 
-const MAX_ENEMIES = 4;
+const MAX_PER_TEAM = 4; // Лимит танков на команду
 let enemyIdCounter = 1000;
 
 export function hitEnemy(index) {
@@ -33,21 +33,47 @@ export function hitEnemy(index) {
     return false; 
 }
 
-export function updateEnemies(gameWidth, gameHeight, onCheckCollision) {
-    // 1. Спавн
-    if (enemies.length < MAX_ENEMIES) {
-        spawnTimer++;
-        if (spawnTimer > SPAWN_DELAY) {
-            spawnEnemy(onCheckCollision);
-            spawnTimer = 0;
+// activeTeams - массив ID команд (например [1, 2])
+export function updateEnemies(gameWidth, gameHeight, onCheckCollision, playerCounts, activeTeams) {
+    
+    // 1. ЛОГИКА СПАВНА (ДИНАМИЧЕСКАЯ ПО КОМАНДАМ)
+    activeTeams.forEach(teamId => {
+        // Инициализируем таймер, если его нет
+        if (teamSpawnTimers[teamId] === undefined) teamSpawnTimers[teamId] = 0;
+
+        const activeCount = (playerCounts[teamId] || 0) + 
+                            enemies.filter(e => e.team === teamId).length + 
+                            pendingSpawns.filter(s => s.team === teamId).length;
+
+        if (activeCount < MAX_PER_TEAM) {
+            teamSpawnTimers[teamId]++;
+            if (teamSpawnTimers[teamId] > SPAWN_DELAY) {
+                createSpawnAnimation(teamId);
+                teamSpawnTimers[teamId] = 0;
+            }
+        }
+    });
+
+    // 2. ОБНОВЛЕНИЕ ЗВЕЗДОЧЕК
+    for (let i = pendingSpawns.length - 1; i >= 0; i--) {
+        const s = pendingSpawns[i];
+        s.timer++;
+        
+        if (s.timer % 4 === 0) {
+            s.frameIndex++;
+            if (s.frameIndex >= 4) s.frameIndex = 0;
+        }
+
+        if (s.timer > 60) { 
+            spawnTankFromStar(s);
+            pendingSpawns.splice(i, 1);
         }
     }
 
-    // 2. Обновление
+    // 3. ОБНОВЛЕНИЕ ВРАГОВ
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
 
-        // ИИ: Смена направления
         if (!enemy.isMoving || Math.random() < 0.005) {
             changeDirection(enemy);
         }
@@ -62,14 +88,15 @@ export function updateEnemies(gameWidth, gameHeight, onCheckCollision) {
 
         const isInside = nextX >= 0 && nextY >= 0 && nextX <= gameWidth - TILE_SIZE && nextY <= gameHeight - TILE_SIZE;
 
-        // Проверка движения
-        if (isInside && canMoveTo(nextX, nextY) && !onCheckCollision(nextX, nextY, enemy.id)) {
+        // ПРОВЕРКА ДВИЖЕНИЯ
+        // Больше нет ghostTimer. Полагаемся на onCheckCollision (Smart Collision)
+        // Он вернет false (можно ехать), если мы уже застряли внутри другого танка.
+        if (isInside && canMoveTo(nextX, nextY) && !onCheckCollision(nextX, nextY, enemy.x, enemy.y, enemy.id)) {
             enemy.x = nextX;
             enemy.y = nextY;
             enemy.isMoving = true;
             
             enemy.frameTimer++;
-            // Анимация зависит от скорости
             const animSpeed = (enemy.speed > 0.8) ? 4 : 8;
             if (enemy.frameTimer > animSpeed) {
                 enemy.frameTimer = 0;
@@ -77,32 +104,39 @@ export function updateEnemies(gameWidth, gameHeight, onCheckCollision) {
             }
         } else {
             enemy.isMoving = false;
-            // Если уперлись - пытаемся повернуть чаще
             if (Math.random() < 0.5) changeDirection(enemy);
         }
 
-        // --- СТРЕЛЬБА (Обновлено по твоей логике) ---
+        // Стрельба
         enemy.bulletTimer--;
         if (enemy.bulletTimer <= 0) {
             createBullet({
                 ...enemy, 
-                // У бронированного танка пуля быстрее? (В коде ты прислал level: 1 для всех)
-                // Оставим 1, как ты просил.
-                level: 1 
+                level: (enemy.type === 'armor') ? 1 : 1 
             });
-            // Рандом от 60 до 95 кадров (1-1.5 сек)
-            enemy.bulletTimer = 60 + Math.random() * 35;
+            enemy.bulletTimer = 60 + Math.random() * 15;
         }
     }
 }
 
-function spawnEnemy(onCheckCollision) {
-    const spawnPoint = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+function createSpawnAnimation(team) {
+    // Временно хардкодим зависимость Y от команды (это можно тоже вынести в конфиг базы)
+    // 1 (Green) = Низ, 2 (Red) = Верх
+    const isRed = (team === 2);
+    const y = isRed ? 0 : 12 * TILE_SIZE;
     
-    // Строгая проверка перед спавном
-    if (onCheckCollision && onCheckCollision(spawnPoint.x, spawnPoint.y, -1)) {
-        return; // Место занято, не спавним
-    }
+    // X: Случайная колонка (0, 4, 8, 12)
+    const colIndex = SPAWN_COLS[Math.floor(Math.random() * SPAWN_COLS.length)];
+    const x = colIndex * TILE_SIZE;
+
+    // Просто добавляем. Если там уже кто-то есть - пофиг, наложатся и разъедутся.
+    pendingSpawns.push({
+        x, y, team, timer: 0, frameIndex: 0
+    });
+}
+
+function spawnTankFromStar(star) {
+    destroyBlockAt(star.x, star.y);
 
     const rand = Math.random();
     let template = ENEMY_TYPES[0];
@@ -111,11 +145,11 @@ function spawnEnemy(onCheckCollision) {
 
     enemies.push({
         id: enemyIdCounter++,
-        team: 2, 
-        x: spawnPoint.x,
-        y: spawnPoint.y,
+        team: star.team, 
+        x: star.x,
+        y: star.y,
         width: 16, height: 16,
-        direction: 'DOWN',
+        direction: (star.team === 2) ? 'DOWN' : 'UP', 
         speed: template.speed,
         hp: template.hp,
         type: template.type,     
@@ -124,44 +158,42 @@ function spawnEnemy(onCheckCollision) {
         frameIndex: 0,
         frameTimer: 0,
         bulletTimer: 60
+        // ghostTimer убран
     });
 }
 
 function changeDirection(enemy) {
     const rand = Math.random();
-    // Предпочтение ехать вниз (к игроку)
-    if (rand < 0.5) enemy.direction = 'DOWN';
-    else if (rand < 0.65) enemy.direction = 'LEFT';
-    else if (rand < 0.8) enemy.direction = 'RIGHT';
-    else enemy.direction = 'UP';
-    
-    // ВАЖНО: Выравнивание координат (Grid Snap)
-    // Поскольку скорость дробная (0.4, 1.2), координаты могут стать "кривыми" (напр. 100.4).
-    // Это вызывает застревание в стенах при повороте.
-    // При каждом повороте мы округляем позицию до целого пикселя.
+    if (rand < 0.25) enemy.direction = 'DOWN';
+    else if (rand < 0.5) enemy.direction = 'UP';
+    else if (rand < 0.75) enemy.direction = 'LEFT';
+    else enemy.direction = 'RIGHT'; 
+
     enemy.x = Math.round(enemy.x);
     enemy.y = Math.round(enemy.y);
-    
-    // Можно даже жестче - до 2px или 4px, но Math.round должно хватить для 12px хитбокса.
 }
 
 export function drawEnemies(ctx, spritesImage) {
+    pendingSpawns.forEach(s => {
+        const frame = SPRITES.spawn_appear[s.frameIndex];
+        if (frame) {
+            const [sx, sy, sw, sh] = frame;
+            ctx.drawImage(spritesImage, sx, sy, sw, sh, s.x, s.y, TILE_SIZE, TILE_SIZE);
+        }
+    });
+
     enemies.forEach(enemy => {
-        // Получаем массив кадров для этого типа врага
-        // Теперь это просто массив [frame1, frame2], без направлений
         const frames = SPRITES[enemy.spriteKey];
-        
         if (frames) {
             const frame = frames[enemy.frameIndex];
             const [sx, sy, sw, sh] = frame;
             
-            // Рисуем с поворотом
             drawRotated(
                 ctx, 
-                spritesImage, 
-                sx, sy, sw, sh, 
-                Math.round(enemy.x), Math.round(enemy.y), TILE_SIZE, TILE_SIZE, 
-                enemy.direction // Передаем направление ('UP', 'LEFT'...)
+                spritesImage,
+                sx, sy, sw, sh,
+                Math.round(enemy.x), Math.round(enemy.y), TILE_SIZE, TILE_SIZE,
+                enemy.direction
             );
         }
     });

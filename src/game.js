@@ -3,18 +3,19 @@ console.log("Загрузка game.js...");
 import { SPRITES, TILE_SIZE } from './sprites.js';
 import { InputHandler } from './input.js';
 import { level1, drawMapLayers, drawForest, initLevel } from './level.js'; 
-import { canMoveTo } from './physics.js'; 
-import { createBullet, updateBullets, drawBullets, bullets } from './bullet.js';
+import { updateBullets, drawBullets, bullets } from './bullet.js';
 import { createExplosion, updateExplosions, drawExplosions, EXPLOSION_BIG } from './explosion.js';
 import { updateEnemies, drawEnemies, enemies, hitEnemy } from './enemy.js';
-import { checkRectOverlap, drawRotated } from './utils.js';
+import { updatePlayers, drawPlayers, startPlayerSpawn, players } from './player.js'; // <--- Новое
+import { checkRectOverlap } from './utils.js'; 
+import { TEAMS, ACTIVE_TEAMS } from './constants.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const PADDING = 32;
 const MAP_ROWS = 13;
-const MAP_COLS = 15; 
+const MAP_COLS = 13; // Выровняли под твою карту 13x13
 const MAP_WIDTH = MAP_COLS * TILE_SIZE;   
 const MAP_HEIGHT = MAP_ROWS * TILE_SIZE; 
 
@@ -29,50 +30,37 @@ const game = {
     input: new InputHandler()
 };
 
-const gameState = {
-    isGameOver: false
-};
-
-const TEAMS = { GREEN: 1, RED: 2 };
+const gameState = { isGameOver: false };
 
 const bases = [
     { id: 1, team: TEAMS.GREEN, x: 6 * TILE_SIZE, y: 12 * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, isDead: false },
     { id: 2, team: TEAMS.RED, x: 6 * TILE_SIZE, y: 0 * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE, isDead: false }
 ];
 
-const player = {
-    id: 1, team: TEAMS.GREEN,
-    x: 4 * TILE_SIZE, y: 12 * TILE_SIZE,
-    speed: 1, direction: 'UP', isMoving: false, 
-    frameIndex: 0, frameTimer: 0, animationSpeed: 8, bulletCooldown: 0, level: 1,
-    shieldTimer: 180 
-};
+// --- ГЛОБАЛЬНАЯ ПРОВЕРКА КОЛЛИЗИЙ (Для движения) ---
+// Передается в updatePlayers и updateEnemies
+const checkGlobalCollision = (targetX, targetY, currX, currY, excludeId) => {
+    // Хитбокс для проверки (чуть меньше клетки, чтобы не цепляться)
+    const targetRect = { x: targetX + 2, y: targetY + 2, width: 12, height: 12 };
+    const currentRect = { x: currX + 2, y: currY + 2, width: 12, height: 12 };
 
-// --- ФУНКЦИЯ ПРОВЕРКИ ЗАНЯТОСТИ МЕСТА ТАНКОМ ---
-// Используется и игроком, и врагами, чтобы не наезжать друг на друга
-const checkGlobalCollision = (x, y, excludeId) => {
-    // ХИТБОКС ТАНКА (Collision Box)
-    // Делаем его меньше визуального размера (16x16).
-    // Было 14x14 (+1), стало 12x12 (+2).
-    // Это позволяет танкам проезжать впритирку и не зацепляться углами.
-    const rect = { 
-        x: x + 2, 
-        y: y + 2, 
-        width: 12, 
-        height: 12 
+    const checkEntity = (entity) => {
+        if (entity.id === excludeId) return false;
+        if (entity.isSpawning) return false;
+
+        // Если мы наедем на танк в новом месте...
+        if (checkRectOverlap(targetRect, entity)) {
+            // ...проверяем, были ли мы в нем в старом месте?
+            if (checkRectOverlap(currentRect, entity)) {
+                return false; // Уже внутри -> можно ехать (выталкивание)
+            }
+            return true; // Снаружи -> нельзя ехать
+        }
+        return false;
     };
 
-    // 1. Проверка с Игроком
-    if (player.id !== excludeId) {
-        if (checkRectOverlap(rect, player)) return true;
-    }
-
-    // 2. Проверка с Врагами
-    for (const enemy of enemies) {
-        if (enemy.id !== excludeId) {
-            if (checkRectOverlap(rect, enemy)) return true;
-        }
-    }
+    for (const p of players) if (checkEntity(p)) return true;
+    for (const e of enemies) if (checkEntity(e)) return true;
 
     return false;
 };
@@ -80,13 +68,13 @@ const checkGlobalCollision = (x, y, excludeId) => {
 game.sprites.onload = () => {
     console.log("Картинка загружена, старт!");
     initLevel(); 
+    // Спавним игроков
+    players.forEach(p => startPlayerSpawn(p));
     game.isLoaded = true;
     requestAnimationFrame(loop);
 };
 
-game.sprites.onerror = () => {
-    console.error("КРИТИЧЕСКАЯ ОШИБКА: Картинка ./assets/sprites.png не найдена!");
-};
+game.sprites.onerror = () => { console.error("Error loading sprites"); };
 
 function loop() {
     try {
@@ -94,147 +82,95 @@ function loop() {
         draw();
         requestAnimationFrame(loop);
     } catch (e) {
-        console.error("ИГРА УПАЛА:", e);
+        console.error("CRASH:", e);
     }
 }
 
 function update() {
-    if (gameState.isGameOver) {
-        updateExplosions();
-        return; 
-    }
+    if (gameState.isGameOver) { updateExplosions(); return; }
 
-    // --- ИГРОК ---
-    if (player.shieldTimer > 0) player.shieldTimer--;
-
-    if (game.input.keys['Digit1']) { player.level = 1; console.log("Lvl 1"); }
-    if (game.input.keys['Digit4']) { player.level = 4; console.log("Lvl 4"); }
-
-    const direction = game.input.getDirection();
-    if (direction) {
-        player.isMoving = true;
-        player.direction = direction;
-        let nextX = player.x;
-        let nextY = player.y;
-
-        if (direction === 'UP') nextY -= player.speed;
-        else if (direction === 'DOWN') nextY += player.speed;
-        else if (direction === 'LEFT') nextX -= player.speed;
-        else if (direction === 'RIGHT') nextX += player.speed;
-
-        const isInsideMap = 
-            nextX >= 0 && nextY >= 0 && 
-            nextX <= game.width - TILE_SIZE && nextY <= game.height - TILE_SIZE;
-
-        // ДВИЖЕНИЕ: Границы && Стены && Танки
-        if (isInsideMap && canMoveTo(nextX, nextY) && !checkGlobalCollision(nextX, nextY, player.id)) {
-            player.x = nextX;
-            player.y = nextY;
-            player.frameTimer++;
-            if (player.frameTimer > player.animationSpeed) {
-                player.frameTimer = 0;
-                player.frameIndex = (player.frameIndex === 0) ? 1 : 0;
-            }
-        }
-    } else {
-        player.isMoving = false;
-    }
-
-    if (player.bulletCooldown > 0) player.bulletCooldown--;
-
-    if (game.input.keys['Space']) {
-        const maxBullets = (player.level >= 3) ? 2 : 1;
-        
-        // Считаем пули, у которых ownerId совпадает с моим ID
-        const myBulletsCount = bullets.filter(b => b.ownerId === player.id && !b.isDead).length;
-        
-        // console.log("Пуль:", myBulletsCount, "Макс:", maxBullets); // Раскомментируй для проверки
-
-        if (player.bulletCooldown === 0 && myBulletsCount < maxBullets) {
-            createBullet(player);
-            player.bulletCooldown = (player.level >= 2) ? 15 : 25; 
-        }
-    }
-
-    // --- СИСТЕМЫ ---
+    // 1. ОБНОВЛЕНИЕ СУЩНОСТЕЙ
+    updatePlayers(game.input, game.width, game.height, checkGlobalCollision);
     updateBullets(game.width, game.height);
     
-    // Передаем функцию проверки коллизий врагам!
-    updateEnemies(game.width, game.height, checkGlobalCollision);
+    // Считаем активных игроков по командам
+    const playerCounts = { 1: 0, 2: 0 };
+    players.forEach(p => { if(!p.isSpawning) playerCounts[p.team]++; });
     
+    // ПЕРЕДАЕМ СПИСОК АКТИВНЫХ КОМАНД
+    updateEnemies(game.width, game.height, checkGlobalCollision, playerCounts, [TEAMS.GREEN, TEAMS.RED]);
+
     updateExplosions();
 
-    // --- КОЛЛИЗИИ ---
-
-    // 1. ПУЛЯ vs ПУЛЯ
-    for (let i = 0; i < bullets.length; i++) {
-        for (let j = i + 1; j < bullets.length; j++) {
-            const b1 = bullets[i];
-            const b2 = bullets[j];
-            if (b1.isDead || b2.isDead) continue;
-
-            // Сбиваем, только если разные команды (Игрок vs Враг)
-            if (b1.team !== b2.team && checkRectOverlap(b1, b2)) {
-                b1.isDead = true;
-                b2.isDead = true;
-            }
-        }
-    }
+    // 2. БОЕВАЯ ЛОГИКА (Коллизии Пуль)
+    const allTanks = [...enemies, ...players.filter(p => !p.isSpawning)];
 
     bullets.forEach(b => {
         if (b.isDead) return;
 
-        // 2. ПУЛЯ vs БАЗА
+        // A. Пуля vs Пуля
+        for (const otherB of bullets) {
+            if (b !== otherB && !otherB.isDead && b.team !== otherB.team) {
+                if (checkRectOverlap(b, otherB)) {
+                    b.isDead = true; otherB.isDead = true;
+                }
+            }
+        }
+        if (b.isDead) return;
+
+        // B. Пуля vs База
         bases.forEach(base => {
             if (base.isDead) return;
             if (checkRectOverlap(b, base)) {
                 b.isDead = true;
                 base.isDead = true;
                 createExplosion(base.x + 8, base.y + 8, EXPLOSION_BIG);
-                if (base.team === TEAMS.GREEN) {
-                    gameState.isGameOver = true;
-                    console.log("GREEN BASE DESTROYED!");
-                }
+                if (base.team === TEAMS.GREEN) console.log("GREEN LOST"); 
+                else console.log("RED LOST");
+                gameState.isGameOver = true;
             }
         });
 
-        // 3. ПУЛЯ ИГРОКА vs ВРАГ
-        if (b.ownerId === player.id) { // Используем ID
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const enemy = enemies[i];
-                if (checkRectOverlap(b, enemy)) {
-                    b.isDead = true; 
-                    const isDead = hitEnemy(i); 
-                    if (isDead) {
-                        createExplosion(enemy.x + 8, enemy.y + 8, EXPLOSION_BIG);
+        // C. Пуля vs Танк
+        for (const tank of allTanks) {
+            // Урон только врагам (или Friendly Fire, если убрать проверку team)
+            if (b.team !== tank.team) {
+                if (checkRectOverlap(b, tank)) {
+                    b.isDead = true;
+                    
+                    // Проверка Щита
+                    // (Для врагов это поле undefined, так что false)
+                    if (tank.shieldTimer > 0) {
+                        createExplosion(tank.x + 8, tank.y + 8, 'SMALL');
+                        break; 
+                    }
+
+                    // Нанесение урона
+                    let isDead = false;
+                    
+                    // Если это игрок (у него есть keys, значит игрок, или просто проверяем массив)
+                    if (players.includes(tank)) {
+                        isDead = true; // Игрок умирает с 1 выстрела
                     } else {
-                        createExplosion(enemy.x + 8, enemy.y + 8, 'SMALL'); 
+                        // Это бот
+                        const idx = enemies.indexOf(tank);
+                        if (idx !== -1) isDead = hitEnemy(idx);
+                    }
+
+                    if (isDead) {
+                        createExplosion(tank.x + 8, tank.y + 8, EXPLOSION_BIG);
+                        if (players.includes(tank)) {
+                            console.log(`PLAYER ${tank.id} DIED`);
+                            startPlayerSpawn(tank); // Респаун
+                        }
+                    } else {
+                        createExplosion(tank.x + 8, tank.y + 8, 'SMALL'); // Броня
                     }
                     break;
                 }
             }
         }
-        
-        // 4. ПУЛЯ ВРАГА vs ИГРОК
-        if (b.team === TEAMS.RED) { // Если пуля вражеская
-            if (checkRectOverlap(b, player)) {
-                 b.isDead = true;
-                 if (player.shieldTimer <= 0) {
-                     console.log("PLAYER DIED!");
-                     createExplosion(player.x + 8, player.y + 8, EXPLOSION_BIG);
-                     respawnPlayer();
-                 }
-            }
-        }
     });
-}
-
-function respawnPlayer() {
-    player.x = 4 * TILE_SIZE;
-    player.y = 12 * TILE_SIZE;
-    player.direction = 'UP';
-    player.level = 1; 
-    player.shieldTimer = 180; 
 }
 
 function draw() {
@@ -249,7 +185,6 @@ function draw() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, game.width, game.height);
 
-    // Слой 1: Земля и Стены
     if (typeof drawMapLayers === 'function') drawMapLayers(ctx, game.sprites, level1, Date.now()); 
 
     bases.forEach(base => {
@@ -257,42 +192,11 @@ function draw() {
         ctx.drawImage(game.sprites, baseSprite[0], baseSprite[1], baseSprite[2], baseSprite[3], base.x, base.y, 16, 16);
     });
 
-    // Слой 2: Танки и Пули
     drawBullets(ctx, game.sprites);
     drawEnemies(ctx, game.sprites);
-    
-    if (!gameState.isGameOver) { 
-        // Теперь SPRITES.player - это просто массив кадров
-        const frames = SPRITES.player;
-        if (frames) {
-            const frame = frames[player.frameIndex];
-            if (frame) {
-                const [sx, sy, sWidth, sHeight] = frame;
-                
-                // Используем вращение
-                drawRotated(
-                    ctx, game.sprites,
-                    sx, sy, sWidth, sHeight,
-                    Math.round(player.x), Math.round(player.y), TILE_SIZE, TILE_SIZE,
-                    player.direction
-                );
-            }
-        }
-        
-        // Отрисовка щита (щит крутить не надо, он круглый/симметричный)
-        if (player.shieldTimer > 0) {
-            const shieldFrameIndex = Math.floor(Date.now() / 50) % 2;
-            const shieldFrame = SPRITES.shield[shieldFrameIndex];
-            if (shieldFrame) {
-                const [sx, sy, sw, sh] = shieldFrame;
-                ctx.drawImage(game.sprites, sx, sy, sw, sh, Math.round(player.x), Math.round(player.y), TILE_SIZE, TILE_SIZE);
-            }
-        }
-    }
+    drawPlayers(ctx, game.sprites); // <--- Теперь используем правильную функцию!
+    drawExplosions(ctx, game.sprites);
 
-    drawExplosions(ctx, game.sprites); // Взрывы поверх танков
-
-    // Слой 3: Лес
     if (typeof drawForest === 'function') drawForest(ctx, game.sprites, level1); 
 
     if (gameState.isGameOver) {
