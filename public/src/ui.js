@@ -1,5 +1,5 @@
 import { SPRITES, TILE_SIZE } from './sprites.js';
-import { MAP_WIDTH, PADDING } from './config.js';
+import { MAP_WIDTH, PADDING } from '../shared/config.js';
 
 // Хелпер для отрисовки цифр (черных)
 // Учитывает, что 0-4 на одной строке, 5-9 на следующей
@@ -23,11 +23,14 @@ function drawNumber(ctx, spritesImage, number, x, y) {
     }
 }
 
-export function drawHUD(ctx, spritesImage, players) {
-    const startX = MAP_WIDTH + 8;
-    let cursorY = TILE_SIZE * 8; 
+export function drawHUD(ctx, spritesImage, playersMap) {
+    const startX = MAP_WIDTH + 32 + 8;
+    let cursorY = TILE_SIZE * 9; 
 
-    const p1 = players.find(p => p.id === 1);
+    const playersArray = Object.values(playersMap);
+
+    const p1 = playersArray.find(p => p.playerIndex === 0);
+    
     if (p1) {
         const [ipX, ipY, ipW, ipH] = SPRITES.ui.ip;
         ctx.drawImage(spritesImage, ipX, ipY, ipW, ipH, startX, cursorY, ipW, ipH);
@@ -42,7 +45,7 @@ export function drawHUD(ctx, spritesImage, players) {
         cursorY += 16;
     }
 
-    const p2 = players.find(p => p.id === 2);
+    const p2 = playersArray.find(p => p.playerIndex === 1);
     if (p2) { 
         const [iipX, iipY, iipW, iipH] = SPRITES.ui.iip;
         ctx.drawImage(spritesImage, iipX, iipY, iipW, iipH, startX, cursorY, iipW, iipH);
@@ -54,7 +57,9 @@ export function drawHUD(ctx, spritesImage, players) {
 
         drawNumber(ctx, spritesImage, Math.max(0, p2.lives), startX + 8, cursorY);
         
-        cursorY += 16;
+        cursorY += 32;
+    } else {
+        cursorY += 8 + 32;
     }
 
     const [fx, fy, fw, fh] = SPRITES.ui.flag;

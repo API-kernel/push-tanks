@@ -1,13 +1,9 @@
-import { TILE_SIZE, SPRITES } from './sprites.js';
+import { TILE_SIZE } from '../shared/config.js';
 import { level1 } from './level.js';
-import { createExplosion, EXPLOSION_SMALL } from './explosion.js';
-import { audio } from './audio.js';
-import { players } from './player.js';
 
 export const bullets = [];
 
 export function createBullet(shooter) {
-    // shooter - это или объект player, или объект enemy
     let x = shooter.x + TILE_SIZE / 2;
     let y = shooter.y + TILE_SIZE / 2;
 
@@ -23,12 +19,9 @@ export function createBullet(shooter) {
         direction: shooter.direction, 
         speed, 
         isDead: false,
-        
-        // ВАЖНО: Сохраняем ID того, кто стрелял
         ownerId: shooter.id, 
         team: shooter.team,
         ownerLevel: shooter.level || 1,
-        
         width: 4, height: 4
     };
 
@@ -37,6 +30,9 @@ export function createBullet(shooter) {
 }
 
 export function updateBullets(gameWidth, gameHeight) {
+    // Возвращаем список событий, произошедших в этом кадре (Взрывы, удары)
+    const events = [];
+
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
 
@@ -54,35 +50,40 @@ export function updateBullets(gameWidth, gameHeight) {
             b.x += stepX;
             b.y += stepY;
 
-            // --- ИЗМЕНЕНИЕ: Взрыв об край ---
+            // Вылет за карту
             if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
                 b.isDead = true;
-                
-                // Рисуем взрыв ровно в точке вылета пули.
-                // Не смещаем координаты вручную, padding канваса позволит увидеть взрыв целиком.
-                createExplosion(b.x, b.y, EXPLOSION_SMALL);
-
-                if (players.some(p => p.id === b.ownerId)) {
-                    audio.play('miss_hit');
-                }
+                // Событие взрыва (на клиенте нарисуем и сыграем звук)
+                events.push({ type: 'WALL_HIT', x: b.x, y: b.y, ownerId: b.ownerId });
                 break;
             }
 
-            if (checkCollisionAndDestroy(b)) {
+            const collisionResult = checkCollisionAndDestroy(b);
+            if (collisionResult) {
+                // Если было попадание - добавляем событие
+                events.push({ 
+                    type: 'HIT', 
+                    x: b.x, y: b.y, 
+                    ownerId: b.ownerId,
+                    isSteel: collisionResult === 'STEEL',
+                    level: b.ownerLevel
+                });
                 break; 
             }
         }
     }
+    
+    return events;
 }
 
 function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
+// Возвращает тип удара ('BRICK', 'STEEL', 'BASE_WALL') или false
 function checkCollisionAndDestroy(bullet) {
-    if (bullet.isDead) return true;
+    if (bullet.isDead) return false;
 
-    // --- 1. HIT TEST ---
     let hitDetected = false;
     let isSteelHit = false;
     let contactEdge = (bullet.direction === 'UP' || bullet.direction === 'LEFT') ? -Infinity : Infinity;
@@ -130,51 +131,24 @@ function checkCollisionAndDestroy(bullet) {
 
     if (!hitDetected) return false;
 
-    // ЗВУК УДАРА (Только если владелец пули - локальный игрок)
-    // Ищем, есть ли такой ID в массиве players
-    const isLocalPlayer = players.some(p => p.id === bullet.ownerId);
-    
-    if (isLocalPlayer) {
-        if (isSteelHit) {
-            if (bullet.ownerLevel < 4) {
-                audio.play('miss_hit');
-            } else {
-                audio.play('concrete_hit'); // Или wall_hit, звук разрушения
-            }
-        } 
-        else {
-            audio.play('brick_hit');
-        }
-    }
-
-    // --- НОВАЯ ЛОГИКА: ЗАЩИТА БАЗЫ ОТ БОТОВ ---
-    // Если стрелял БОТ (ownerId >= 1000), проверяем, не попал ли он в защиту СВОЕЙ базы.
+    // ЗАЩИТА ОТ СВОИХ
     if (bullet.ownerId >= 1000) {
         const bRow = Math.floor(bullet.y / TILE_SIZE);
         const bCol = Math.floor(bullet.x / TILE_SIZE);
         if (bullet.team === 2 && bRow <= 2 && bCol >= 5 && bCol <= 7) {
             bullet.isDead = true; 
-            createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL); // <-- Взрывчик
-            return true; 
+            return 'FRIENDLY_WALL'; 
         }
         if (bullet.team === 1 && bRow >= 10 && bCol >= 5 && bCol <= 7) {
             bullet.isDead = true;
-            createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL); // <-- Взрывчик
-            return true;
+            return 'FRIENDLY_WALL'; 
         }
     }
 
-    // 2. Обычное попадание
     bullet.isDead = true;
-    
-    // РИСУЕМ ВЗРЫВ!
-    // Смещаем к центру пули
-    createExplosion(bullet.x + 2, bullet.y + 2, EXPLOSION_SMALL);
+    if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL'; // Бетон не пробит
 
-    // Если бетон и слабый танк - выходим (урон не наносим, но взрыв показали)
-    if (isSteelHit && bullet.ownerLevel < 4) return true;
-
-    // --- 2. DAMAGE BOX ---
+    // --- РАЗРУШЕНИЕ ---
     const cx = bullet.x + bullet.width / 2;
     const cy = bullet.y + bullet.height / 2;
     const lateralSnap = isSteelHit ? 8 : 4;
@@ -215,7 +189,6 @@ function checkCollisionAndDestroy(bullet) {
         damageRect.w = depth;
     }
 
-    // --- 3. APPLY DAMAGE ---
     const dStartCol = Math.floor(damageRect.x / TILE_SIZE);
     const dEndCol   = Math.floor((damageRect.x + damageRect.w) / TILE_SIZE);
     const dStartRow = Math.floor(damageRect.y / TILE_SIZE);
@@ -249,7 +222,11 @@ function checkCollisionAndDestroy(bullet) {
                             for (let c = 0; c < 4; c++) {
                                 const bitIndex = r * 4 + c;
                                 if ((block.mask & (1 << bitIndex)) !== 0) {
-                                    const subRect = { x: blockX + c * 4, y: blockY + r * 4, w: 4, h: 4 };
+                                    const subRect = {
+                                        x: blockX + c * 4,
+                                        y: blockY + r * 4,
+                                        w: 4, h: 4
+                                    };
                                     if (checkRectIntersection(damageRect, subRect)) {
                                         block.mask &= ~(1 << bitIndex);
                                     }
@@ -262,23 +239,6 @@ function checkCollisionAndDestroy(bullet) {
             }
         }
     }
-    return true;
-}
 
-export function drawBullets(ctx, spritesImage) {
-    bullets.forEach(b => {
-        // 1. Берем спрайт для конкретного направления
-        const spriteData = SPRITES.bullet[b.direction];
-        
-        if (spriteData) {
-            const [sx, sy, w, h] = spriteData;
-            
-            // 2. Центрируем спрайт внутри хитбокса пули (который 4x4)
-            // Math.floor важен, чтобы не попасть в полупиксели (избегаем мыла)
-            const dx = Math.floor(b.x + (b.width - w) / 2);
-            const dy = Math.floor(b.y + (b.height - h) / 2);
-
-            ctx.drawImage(spritesImage, sx, sy, w, h, dx, dy, w, h);
-        }
-    });
+    return isSteelHit ? 'STEEL' : 'BRICK';
 }

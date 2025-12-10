@@ -5,7 +5,7 @@ export class InputHandler {
         const gameKeys = [
             'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
             'KeyW', 'KeyA', 'KeyS', 'KeyD', 
-            'ControlLeft', 'ControlRight', 'ShiftLeft', 'Enter'
+            'ControlLeft', 'ControlRight', 'ShiftLeft', 'Enter', 'Digit0'
         ];
 
         window.addEventListener('keydown', (e) => {

@@ -1,4 +1,4 @@
-import { TILE_SIZE } from './sprites.js';
+import { TILE_SIZE } from '../shared/config.js';
 import { level1 } from './level.js';
 
 function checkRectIntersection(r1, r2) {

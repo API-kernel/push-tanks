@@ -54,11 +54,11 @@ export const BONUS_WEIGHTS = {
     'shovel': 25
 };
 
-// Длительность эффектов (в кадрах, 60 FPS)
-export const HELMET_DURATION = 300;  // 5 сек
-export const SHOVEL_DURATION = 900;  // 15 сек
-export const CLOCK_DURATION  = 600;  // 10 сек (стандарт)
+export const HELMET_DURATION = 300; 
+export const SHOVEL_DURATION = 900;
+export const CLOCK_DURATION  = 600;
 
+// Маски стен
 export const WALL_MASKS = {
     LEFT:   0x3333,
     RIGHT:  0xCCCC,
@@ -67,12 +67,13 @@ export const WALL_MASKS = {
     FULL:   0xFFFF
 };
 
+// Стены вокруг баз
 export const BASE_WALLS = {
     [1]: [ // GREEN (Низ)
         { r: 12, c: 5, mask: WALL_MASKS.RIGHT },
-        { r: 11, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.BOTTOM }, // Угол
+        { r: 11, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.BOTTOM },
         { r: 11, c: 6, mask: WALL_MASKS.BOTTOM },
-        { r: 11, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.BOTTOM },  // Угол
+        { r: 11, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.BOTTOM },
         { r: 12, c: 7, mask: WALL_MASKS.LEFT }
     ],
     [2]: [ // RED (Верх)
