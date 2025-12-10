@@ -18,7 +18,7 @@ export const players = [
         hp: TANK_STATS.player.hp,
         direction: 'UP', isMoving: false, 
         frameIndex: 0, frameTimer: 0, 
-        bulletCooldown: 0, level: 1,
+        bulletCooldown: 0, level: 1, lives: 2,
         shieldTimer: 0, 
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
         keys: { fire: 'Space' } 
@@ -31,7 +31,7 @@ export const players = [
         hp: TANK_STATS.player.hp,
         direction: 'UP', isMoving: false, 
         frameIndex: 0, frameTimer: 0, 
-        bulletCooldown: 0, level: 1,
+        bulletCooldown: 0, level: 1, lives: 2,
         shieldTimer: 0,
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
         keys: { fire: 'Enter' } 
@@ -129,4 +129,17 @@ export function drawPlayers(ctx, spritesImage) {
             drawTank(ctx, spritesImage, p);
         }
     });
+}
+
+export function killPlayer(p) {
+    p.lives--;
+    if (p.lives >= 0) { 
+        console.log(`Player ${p.id} died. Lives left: ${p.lives}`);
+        startPlayerSpawn(p);
+        return false;
+    } else {
+        console.log(`Player ${p.id} GAME OVER`);
+        p.x = -1000; p.y = -1000; 
+        return true;
+    }
 }

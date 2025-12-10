@@ -6,13 +6,14 @@ import { level1, drawMapLayers, drawForest, initLevel } from './level.js';
 import { updateBullets, drawBullets, bullets } from './bullet.js';
 import { createExplosion, updateExplosions, drawExplosions, EXPLOSION_BIG } from './explosion.js';
 import { updateEnemies, drawEnemies, enemies, hitEnemy } from './enemy.js';
-import { updatePlayers, drawPlayers, startPlayerSpawn, players } from './player.js';
+import { updatePlayers, drawPlayers, startPlayerSpawn, players, killPlayer } from './player.js';
 import { checkRectOverlap } from './utils.js'; 
 import { teamManager } from './team_manager.js'; 
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING } from './config.js';
 import { audio } from './audio.js';
 import { spawnBonus, drawBonuses, checkBonusCollection, activeBonus } from './bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS } from './config.js';
+import { drawHUD } from './ui.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -179,14 +180,20 @@ function update() {
                         createExplosion(tank.x + 8, tank.y + 8, EXPLOSION_BIG);
                         
                         if (players.includes(tank)) {
-                            console.log("PLAYER DIED");
-                            audio.play('explosion_player'); // <--- Смерть игрока
-                            startPlayerSpawn(tank);
+                            audio.play('explosion_player');
+                            const isGameOverForPlayer = killPlayer(tank);
+                            
+                            if (isGameOverForPlayer) {
+                                const alivePlayers = players.filter(p => p.lives >= 0);
+                                if (alivePlayers.length === 0) {
+                                    gameState.isGameOver = true;
+                                    console.log("ALL PLAYERS DEAD");
+                                }
+                            }
                         } else {
-                            audio.play('explosion_bot'); // <--- Смерть бота
+                            audio.play('explosion_bot');
                         }
                     } else {
-                        // Попали, но не убили (Броня)
                         createExplosion(tank.x + 8, tank.y + 8, 'SMALL'); 
                         audio.play('armor_hit'); // <--- Звук брони
                     }
@@ -252,6 +259,7 @@ function draw() {
     drawPlayers(ctx, game.sprites);
     drawExplosions(ctx, game.sprites);
     drawBonuses(ctx, game.sprites); 
+    drawHUD(ctx, game.sprites, players);    
 
     if (typeof drawForest === 'function') drawForest(ctx, game.sprites, level1); 
 
@@ -309,8 +317,8 @@ function applyBonus(player, type) {
             break;
             
         case 'tank':
-            // +1 Жизнь (пока просто звук)
-            // audio.play('life_up');
+            player.lives++;
+            audio.play('life_up');
             break;
     }
 }

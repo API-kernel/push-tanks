@@ -9,10 +9,10 @@ body {
 }
 
 canvas {
-    width: 816px; 
-    height: 816px; 
+    width: 864px; 
+    height: 816px;
     
-    background-color: #636363; /* Серый цвет рамки */
-    image-rendering: pixelated; /* Обязательно для пиксель-арта */
+    background-color: #636363;
+    image-rendering: pixelated;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }

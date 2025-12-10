@@ -3,10 +3,12 @@ export const TILE_SIZE = 16;
 export const MAP_ROWS = 13;
 export const MAP_COLS = 13;
 export const PADDING = 32;
+export const HUD_WIDTH = 32;
 
 export const MAP_WIDTH = MAP_COLS * TILE_SIZE;
 export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
-export const CANVAS_WIDTH = MAP_WIDTH + PADDING * 2;
+
+export const CANVAS_WIDTH = PADDING + MAP_WIDTH + HUD_WIDTH + 16; 
 export const CANVAS_HEIGHT = MAP_HEIGHT + PADDING * 2;
 
 export const SPAWN_DELAY = 120; 
