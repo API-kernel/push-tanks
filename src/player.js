@@ -4,26 +4,30 @@ import { createBullet, bullets } from './bullet.js';
 import { updateTankMovement, drawTank } from './tank.js'; 
 import { TANK_STATS } from './config.js'; 
 import { teamManager } from './team_manager.js';
-import { audio } from './audio.js';
+import { audio } from './audio.js'; // <--- ВЕРНУЛИ АУДИО
 
-// Приоритет колонок для спавна игроков: P1->4, P2->8, P3->0, P4->12
 const SPAWN_PRIORITY = [4, 8, 0, 12];
 
 export const players = [
-    // Игрок 1 (Зеленый) -> Будет спавниться на 4
+    // ИГРОК 1 (WASD + Space)
     {
         id: 1, team: 1,
-        x: 0, y: 0, // Задастся при спавне
+        x: 0, y: 0,
         speed: TANK_STATS.player.speed, 
         hp: TANK_STATS.player.hp,
         direction: 'UP', isMoving: false, 
         frameIndex: 0, frameTimer: 0, 
-        bulletCooldown: 0, level: 1, lives: 2,
+        bulletCooldown: 0, level: 1,
         shieldTimer: 0, 
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
-        keys: { fire: 'Space' } 
+        lives: 3,
+        
+        keys: { 
+            up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', 
+            fire: 'Space' // Удобно под левую руку
+        } 
     },
-    // Игрок 2 (Зеленый, Манекен) -> Будет спавниться на 8
+    // ИГРОК 2 (Стрелки + Enter/RightCtrl)
     {
         id: 2, team: 1,
         x: 0, y: 0,
@@ -31,10 +35,15 @@ export const players = [
         hp: TANK_STATS.player.hp,
         direction: 'UP', isMoving: false, 
         frameIndex: 0, frameTimer: 0, 
-        bulletCooldown: 0, level: 1, lives: 2,
+        bulletCooldown: 0, level: 1,
         shieldTimer: 0,
         isSpawning: true, spawnTimer: 0, spawnFrameIndex: 0,
-        keys: { fire: 'Enter' } 
+        lives: 3,
+        
+        keys: { 
+            up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', 
+            fire: 'Enter' // Или 'ControlRight'
+        } 
     }
 ];
 
@@ -42,36 +51,41 @@ export function startPlayerSpawn(p) {
     p.isSpawning = true;
     p.spawnTimer = 0;
     p.shieldTimer = 0;
-    p.level = 1; 
-    
-    // --- ЖЕСТКИЙ РАСЧЕТ ПОЗИЦИИ ---
-    
-    // 1. Выбираем колонку на основе ID
-    // (ID 1 -> index 0 -> col 4)
-    // (ID 2 -> index 1 -> col 8)
+    p.level = 1;
+
     const colIndex = (p.id - 1) % SPAWN_PRIORITY.length;
     const col = SPAWN_PRIORITY[colIndex];
 
-    // 2. Выбираем ряд (Y) на основе команды
-    // Спрашиваем у менеджера, где спавнится эта команда (верх или низ)
     const teamConfig = teamManager.getTeam(p.team);
     const spawnY = teamConfig ? teamConfig.spawnPixelY : 12 * TILE_SIZE;
     
-    // 3. Устанавливаем координаты
     p.x = col * TILE_SIZE;
     p.y = spawnY;
 
-    // 4. Устанавливаем направление
     if (teamConfig) {
         p.direction = teamConfig.direction;
     }
 
-    // 5. Чистим место (стены, лес, воду)
     destroyBlockAt(p.x, p.y);
+}
+
+export function killPlayer(p) {
+    p.lives--;
+    if (p.lives >= 0) { 
+        console.log(`Player ${p.id} died. Lives left: ${p.lives}`);
+        startPlayerSpawn(p);
+        return false;
+    } else {
+        console.log(`Player ${p.id} GAME OVER`);
+        p.x = -1000; p.y = -1000; 
+        return true;
+    }
 }
 
 export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
     players.forEach(p => {
+        if (p.lives < 0) return;
+
         // 1. СПАВН
         if (p.isSpawning) {
             p.spawnTimer++;
@@ -87,9 +101,10 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
         if (p.shieldTimer > 0) p.shieldTimer--;
 
         // 3. ДВИЖЕНИЕ
-        let direction = null;
-        // Управление пока только для P1
-        if (p.id === 1) direction = input.getDirection(); 
+        let direction = input.getDirection(p.keys);
+
+        // ЗВУК МОТОРА (Только для P1 пока, чтобы не шуметь, или для всех локальных)
+        // audio.updateEngine(p.id, !!direction); 
 
         if (direction) {
             updateTankMovement(p, direction, gameWidth, gameHeight, onCheckCollision);
@@ -104,13 +119,13 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
         // 4. СТРЕЛЬБА
         if (p.bulletCooldown > 0) p.bulletCooldown--;
         
-        if (p.id === 1 && input.keys[p.keys.fire]) {
+        if (input.keys[p.keys.fire]) {
             const maxBullets = (p.level >= 3) ? 2 : 1;
             const myBullets = bullets.filter(b => b.ownerId === p.id && !b.isDead).length;
             
             if (p.bulletCooldown === 0 && myBullets < maxBullets) {
                 createBullet(p);
-                audio.play('fire');
+                audio.play('fire'); // <--- ВЕРНУЛИ ЗВУК!
                 p.bulletCooldown = (p.level >= 2) ? 15 : 25; 
             }
         }
@@ -119,6 +134,8 @@ export function updatePlayers(input, gameWidth, gameHeight, onCheckCollision) {
 
 export function drawPlayers(ctx, spritesImage) {
     players.forEach(p => {
+        if (p.lives < 0) return;
+
         if (p.isSpawning) {
             const frame = SPRITES.spawn_appear[p.spawnFrameIndex];
             if (frame) {
@@ -129,17 +146,4 @@ export function drawPlayers(ctx, spritesImage) {
             drawTank(ctx, spritesImage, p);
         }
     });
-}
-
-export function killPlayer(p) {
-    p.lives--;
-    if (p.lives >= 0) { 
-        console.log(`Player ${p.id} died. Lives left: ${p.lives}`);
-        startPlayerSpawn(p);
-        return false;
-    } else {
-        console.log(`Player ${p.id} GAME OVER`);
-        p.x = -1000; p.y = -1000; 
-        return true;
-    }
 }

@@ -52,6 +52,13 @@ const checkGlobalCollision = (targetX, targetY, currX, currY, excludeId) => {
     for (const p of players) if (checkEntity(p)) return true;
     for (const e of enemies) if (checkEntity(e)) return true;
 
+    const bases = teamManager.getAllBases();
+    for (const base of bases) {
+        if (checkRectOverlap(targetRect, base)) {
+            return true; 
+        }
+    }
+
     return false;
 };
 

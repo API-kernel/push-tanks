@@ -59,6 +59,18 @@ class TeamManager {
         return possiblePoints[Math.floor(Math.random() * possiblePoints.length)];
     }
 
+    getAllBases() {
+        return Object.values(this.teams).map(t => ({
+            team: t.id,
+            x: t.basePos.x,
+            y: t.basePos.y,
+            width: TILE_SIZE, // 16
+            height: TILE_SIZE, // 16
+            isDead: !t.baseAlive,
+            name: t.name // Чтобы знать имя при Game Over
+        }));
+    }
+
     fortifyBase(teamId, isSteel) {
         const team = this.teams[teamId];
         if (!team || !team.baseAlive) return;

@@ -1,25 +1,40 @@
-// src/input.js
 export class InputHandler {
     constructor() {
-        this.keys = {}; // Храним состояние кнопок: { "ArrowUp": true, "KeyW": false }
+        this.keys = {};
 
-        // Когда нажали кнопку - ставим true
+        const gameKeys = [
+            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
+            'KeyW', 'KeyA', 'KeyS', 'KeyD', 
+            'ControlLeft', 'ControlRight', 'ShiftLeft', 'Enter'
+        ];
+
         window.addEventListener('keydown', (e) => {
+            // e.code дает физический код клавиши (KeyW, ArrowUp, ControlLeft)
             this.keys[e.code] = true;
+            
+            if (gameKeys.includes(e.code)) {
+                e.preventDefault();
+            }
         });
 
-        // Когда отпустили - ставим false
         window.addEventListener('keyup', (e) => {
             this.keys[e.code] = false;
         });
     }
 
-    // Метод, который говорит игре, куда хочет игрок
-    getDirection() {
-        if (this.keys['ArrowUp'] || this.keys['KeyW']) return 'UP';
-        if (this.keys['ArrowDown'] || this.keys['KeyS']) return 'DOWN';
-        if (this.keys['ArrowLeft'] || this.keys['KeyA']) return 'LEFT';
-        if (this.keys['ArrowRight'] || this.keys['KeyD']) return 'RIGHT';
+    // Теперь принимает объект настроек: { up: 'KeyW', down: 'KeyS', ... }
+    getDirection(keyMap) {
+        if (!keyMap) return null;
+
+        // Проверяем нажатия по переданной карте
+        // Приоритет можно менять, но обычно UP/DOWN > LEFT/RIGHT или наоборот.
+        // Здесь порядок: если зажаты две, победит первая в списке.
+        
+        if (this.keys[keyMap.up]) return 'UP';
+        if (this.keys[keyMap.down]) return 'DOWN';
+        if (this.keys[keyMap.left]) return 'LEFT';
+        if (this.keys[keyMap.right]) return 'RIGHT';
+        
         return null;
     }
 }
