@@ -33,7 +33,13 @@ export class GameRoom {
 
         this.resetGame();
 
-        this.interval = setInterval(() => this.update(), 1000 / 60);
+        this.isRunning = false;
+
+        this.settings = {
+            level: 1,
+            botsEnabled: true,
+            friendlyFire: false // Задел на будущее
+        };
     }
 
     addPlayer(socketId, localIndex) {
@@ -48,14 +54,16 @@ export class GameRoom {
 
         const teamId = 1; 
         const sp = this.getPlayerSpawnPoint(pIndex, teamId);
-
+        const teamConfig = this.teamManager.getTeam(teamId);
+        
         this.players[uniqueId] = {
             id: uniqueId,
             socketId, localIndex, playerIndex: pIndex,
             team: teamId,
             x: sp.x, y: sp.y,
             speed: TANK_STATS.player.speed,
-            direction: 'UP', isMoving: false, hp: 1, lives: 3, level: 1,
+            direction: teamConfig ? teamConfig.direction : 'UP',
+            isMoving: false, hp: 1, lives: 3, level: 1,
             isDead: false, respawnTimer: 0,
             isSpawning: true, spawnAnimTimer: 0,
             shieldTimer: 180,
@@ -66,10 +74,45 @@ export class GameRoom {
         destroyBlockAt(this.map, this.players[uniqueId].x, this.players[uniqueId].y);
     }
 
+    removeLocalPlayer(socketId, localIndex) {
+        const uniqueId = `${socketId}_${localIndex}`;
+        if (this.players[uniqueId]) {
+            delete this.players[uniqueId];
+        }
+    }
+
     removePlayer(socketId) {
         for (const id in this.players) {
             if (id.startsWith(socketId)) delete this.players[id];
         }
+    }
+
+    updateSettings(newSettings) {
+        this.settings = { ...this.settings, ...newSettings };
+    }
+
+    startGame() {
+        if (this.isRunning) return;
+        
+        if (this.interval) clearInterval(this.interval);
+
+        this.resetGame(); // Сброс карты и позиций
+        this.isRunning = true;
+        
+        // Запускаем цикл
+        this.interval = setInterval(() => this.update(), 1000 / 60);
+        
+        // Сообщаем всем, что игра началась (переход из лобби в канвас)
+        this.io.to(this.id).emit('game_start');
+        
+        // Отправляем начальную карту (важно!)
+        this.io.to(this.id).emit('map_init', this.map);
+    }
+
+    stopGame() {
+        this.isRunning = false;
+        if (this.interval) clearInterval(this.interval);
+        // Можно выкинуть игроков обратно в лобби событием 'game_end'
     }
 
     handleInput(socketId, data) {
@@ -86,8 +129,20 @@ export class GameRoom {
             this.gameOverTimer++;
             if (this.gameOverTimer > 300) {
                 this.resetGame();
+                this.io.to(this.id).emit('game_restart'); // Можно добавить это событие
             }
-            this.broadcastState();
+
+            this.io.to(this.id).emit('state', {
+                players: this.players,
+                enemies: this.enemies,
+                bullets: this.bullets,
+                events: [],
+                map: this.map,
+                bases: this.teamManager.getAllBases(),
+                isGameOver: this.isGameOver,
+                bonus: this.activeBonus
+            });
+
             return;
         }
 
@@ -134,8 +189,14 @@ export class GameRoom {
             p.respawnTimer--;
             if (p.respawnTimer <= 0 && p.lives >= 0) {
                 p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0; p.level = 1;
+                
                 const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
-                p.x = sp.x; p.y = sp.y;
+                p.x = sp.x;
+                p.y = sp.y;
+                
+                const teamConfig = this.teamManager.getTeam(p.team);
+                p.direction = teamConfig ? teamConfig.direction : 'UP';
+                
                 destroyBlockAt(this.map, p.x, p.y);
             }
             return;
@@ -343,7 +404,8 @@ export class GameRoom {
             map: this.map,
             bases: this.teamManager.getAllBases(),
             isGameOver: this.isGameOver,
-            bonus: this.activeBonus
+            bonus: this.activeBonus,
+            settings: this.settings
         });
     }
 }

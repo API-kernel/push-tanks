@@ -28,33 +28,36 @@ export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, pla
     
     // 1. СПАВН
     const teams = room.teamManager.getTeams();
-    teams.forEach(team => {
-        // Инициализируем таймер в комнате, если нет
-        if (room.teamSpawnTimers[team.id] === undefined) room.teamSpawnTimers[team.id] = 0;
+    if (room.settings && room.settings.botsEnabled) {
+        const teams = room.teamManager.getTeams();
+        teams.forEach(team => {
+            // Инициализируем таймер в комнате, если нет
+            if (room.teamSpawnTimers[team.id] === undefined) room.teamSpawnTimers[team.id] = 0;
 
-        const activeCount = (playerCounts[team.id] || 0) + 
-                            room.enemies.filter(e => e.team === team.id).length + 
-                            room.pendingSpawns.filter(s => s.team === team.id).length;
+            const activeCount = (playerCounts[team.id] || 0) + 
+                                room.enemies.filter(e => e.team === team.id).length + 
+                                room.pendingSpawns.filter(s => s.team === team.id).length;
 
-        // Используем лимит из менеджера
-        if (activeCount < room.teamManager.getMaxUnits(team.id)) {
-            room.teamSpawnTimers[team.id]++;
-            if (room.teamSpawnTimers[team.id] > SPAWN_DELAY) {
-                // Собираем всех занятых (танки + звездочки)
-                // allTanks передается? Нет, берем из room.enemies + room.players
-                // Но onCheckCollision уже проверяет игроков и врагов.
-                // Для спавна нам нужны координаты.
-                const busyEntities = [...Object.values(room.players), ...room.enemies, ...room.pendingSpawns];
-                
-                const point = room.teamManager.getSpawnPoint(team.id, busyEntities);
-                
-                if (point) {
-                    createSpawnAnimation(room, team.id, point.x, point.y);
-                    room.teamSpawnTimers[team.id] = 0;
+            // Используем лимит из менеджера
+            if (activeCount < room.teamManager.getMaxUnits(team.id)) {
+                room.teamSpawnTimers[team.id]++;
+                if (room.teamSpawnTimers[team.id] > SPAWN_DELAY) {
+                    // Собираем всех занятых (танки + звездочки)
+                    // allTanks передается? Нет, берем из room.enemies + room.players
+                    // Но onCheckCollision уже проверяет игроков и врагов.
+                    // Для спавна нам нужны координаты.
+                    const busyEntities = [...Object.values(room.players), ...room.enemies, ...room.pendingSpawns];
+                    
+                    const point = room.teamManager.getSpawnPoint(team.id, busyEntities);
+                    
+                    if (point) {
+                        createSpawnAnimation(room, team.id, point.x, point.y);
+                        room.teamSpawnTimers[team.id] = 0;
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
     // 2. ЗВЕЗДОЧКИ
     for (let i = room.pendingSpawns.length - 1; i >= 0; i--) {

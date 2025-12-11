@@ -5,14 +5,182 @@ body {
     align-items: center;
     height: 100vh;
     margin: 0;
+    font-family: 'Press Start 2P', cursive; /* Пиксельный шрифт */
     overflow: hidden;
 }
 
+#game-container {
+    position: relative;
+}
+
 canvas {
-    width: 864px; 
-    height: 816px;
-    
-    background-color: #636363;
+    /* Размеры задаются в JS/предыдущем CSS, тут можно оставить display: block */
+    display: block;
     image-rendering: pixelated;
+    background-color: #636363;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    width: 912px; 
+    height: 816px; 
+}
+
+/* Оверлей меню */
+#menu-screen, #lobby-screen {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 10;
+}
+
+.title {
+    font-size: 60px;
+    text-shadow: 4px 4px #880000;
+    margin-bottom: 60px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.menu-section {
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+.toggle-btn {
+    display: inline-block;
+    padding: 15px 20px;
+    margin: 10px;
+    border: 4px solid #fff;
+    cursor: pointer;
+    opacity: 0.5;
+}
+.toggle-btn.selected {
+    opacity: 1;
+    background-color: #fff;
+    color: #000;
+}
+
+button {
+    font-family: 'Press Start 2P', cursive;
+    background: transparent;
+    color: white;
+    border: 4px solid white;
+    padding: 15px 30px;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 10px;
+}
+button:hover {
+    background: white;
+    color: black;
+}
+
+input {
+    font-family: 'Press Start 2P', cursive;
+    padding: 15px;
+    font-size: 16px;
+    width: 120px;
+    text-transform: uppercase;
+}
+
+.join-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#player-list li {
+    margin: 10px;
+    color: #ccc;
+}
+
+/* Стили для блока настроек в лобби */
+.lobby-settings {
+    margin: 20px 0;
+    padding: 20px;
+    border: 4px solid #63db44; /* Зеленая рамка как у танчиков */
+    background: rgba(0, 50, 0, 0.8);
+    text-align: left;
+    width: 400px; /* Чтобы ширина совпадала с шириной списка игроков */
+}
+
+.lobby-settings label {
+    display: block;
+    margin: 10px 0;
+    font-size: 14px;
+    cursor: pointer;
+    /* Выравнивание текста и инпута */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lobby-settings input[type="number"] {
+    width: 60px;
+    padding: 5px;
+    font-family: 'Press Start 2P', cursive;
+    text-align: center;
+    border: 2px solid white;
+    background: black;
+    color: white;
+}
+
+.lobby-settings input[type="checkbox"] {
+    /* Кастомный чекбокс сложноват, оставим стандартный, но увеличим */
+    transform: scale(1.5);
+    cursor: pointer;
+}
+
+/* Стили для disabled инпутов (для не-хоста) */
+.lobby-settings input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #888;
+    color: #888;
+}
+
+/* Рамка для списка игроков */
+#lobby-players {
+    width: 440px; /* settings width + padding */
+    margin-bottom: 20px;
+}
+
+.lobby-player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 2px dashed #444;
+    font-size: 12px; /* Чуть меньше шрифт, чтобы влезло имя */
+}
+
+/* Кнопки удаления/смены команды внутри строки */
+.lobby-player-row button {
+    padding: 5px 10px;
+    font-size: 10px;
+    margin: 0 2px;
+    border-width: 2px;
+}
+
+/* Кнопка Старт - делаем её большой и заметной */
+#btn-start {
+    font-size: 20px;
+    padding: 20px 40px;
+    border-color: #fca048; /* Оранжевый */
+    color: #fca048;
+    animation: pulse 2s infinite; /* Пульсация */
+}
+
+#btn-start:hover {
+    background: #fca048;
+    color: black;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }

@@ -29,6 +29,54 @@ let serverState = {
     isGameOver: false
 };
 
+window.tankGame = {
+    createRoom: (localCount) => {
+        socket.emit('create_room', { localCount });
+    },
+    joinRoom: (roomId, localCount) => {
+        socket.emit('join_room', { roomId, localCount });
+    },
+    requestStart: () => {
+        socket.emit('start_game');
+    },
+    changeTeam: (localIndex, teamId) => {
+        socket.emit('change_team', { localIndex, teamId });
+    },
+    addLocalPlayer: () => socket.emit('add_local_player'),
+    removeLocalPlayer: (idx) => socket.emit('remove_local_player', idx),
+    updateSettings: (settings) => socket.emit('update_settings', settings)
+};
+
+// --- СОБЫТИЯ ЛОББИ ---
+
+socket.on('room_joined', (data) => {
+    console.log("Joined Room:", data.roomId);
+    // Показываем экран лобби
+    if (window.showLobby) window.showLobby(data.roomId, data.isHost);
+});
+
+socket.on('lobby_update', (data) => {
+     console.log("Lobby Update:", data.players); // <-- Добавь лог, посмотри, что приходит
+    if (window.updateLobbyList) window.updateLobbyList(data.players);
+});
+
+socket.on('game_start', () => {
+    console.log("Game Started!");
+    // Скрываем меню, показываем игру
+    if (window.hideMenu) window.hideMenu();
+    // Фокус на игру (чтобы клавиши работали)
+    window.focus();
+});
+
+socket.on('error_msg', (msg) => {
+    alert(msg);
+});
+
+socket.on('lobby_update', (data) => {
+    // Теперь вызываем updateLobbyUI вместо updateLobbyList
+    if (window.updateLobbyUI) window.updateLobbyUI(data);
+});
+
 // ... (код загрузки спрайтов и socket.on connect/map_init тот же) ...
 game.sprites.onload = () => { game.isLoaded = true; requestAnimationFrame(loop); };
 game.sprites.src = './assets/sprites.png';
@@ -39,8 +87,7 @@ let myId = null;
 socket.on('connect', () => {
     console.log("Connected:", socket.id);
     myId = socket.id;
-    
-    socket.emit('join_game', { count: 2 });
+    window.setMyId(socket.id);
 });
 
 socket.on('state', (state) => {
@@ -64,34 +111,33 @@ socket.on('state', (state) => {
     serverState.bonus = state.bonus;
 
     // 3. События (Взрывы и Звуки)
+// ... внутри socket.on('state') ...
+
     if (state.events && state.events.length > 0) {
         state.events.forEach(e => {
+            // Хелпер: проверка, мое ли это событие
+            // Проверяем, что ownerId это строка (у ботов это число) И что она начинается с моего socket.id
+            const isMine = (typeof e.ownerId === 'string') && e.ownerId.startsWith(myId);
+
             if (e.type === 'WALL_HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
-
-                if (e.ownerId && e.ownerId.startsWith(myId)) {
-                    audio.play('miss_hit');
-                }
+                if (isMine) audio.play('miss_hit');
             }
             else if (e.type === 'SHIELD_HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
-                audio.play('brick_hit');
+                if (isMine) audio.play('brick_hit');
             }
             else if (e.type === 'HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
-                if (e.ownerId && e.ownerId.startsWith(myId)) {
+                if (isMine) {
                     if (e.isSteel) audio.play('concrete_hit');
                     else audio.play('brick_hit');
                 }
             }
             else if (e.type === 'TANK_EXPLODE') {
-                if (e.isPlayer) {
-                     createExplosion(e.x, e.y, EXPLOSION_BIG);
-                    audio.play('explosion_player')
-                } else {
-                    createExplosion(e.x, e.y, EXPLOSION_BIG);
-                    audio.play('explosion_bot');
-                }
+                createExplosion(e.x, e.y, EXPLOSION_BIG);
+                if (e.isPlayer) audio.play('explosion_player');
+                else audio.play('explosion_bot');
             }
             else if (e.type === 'BASE_DESTROY') {
                 createExplosion(e.x, e.y, EXPLOSION_BIG);
@@ -99,19 +145,19 @@ socket.on('state', (state) => {
                 audio.play('game_over');
             }
             else if (e.type === 'ARMOR_HIT') {
+                createExplosion(e.x, e.y, EXPLOSION_SMALL);
                 audio.play('armor_hit');
-            } else if (e.type === 'PLAYER_FIRE') {
-                if (e.ownerId && e.ownerId.startsWith(myId)) {
+            } 
+            else if (e.type === 'PLAYER_FIRE') {
+                if (isMine) {
                     audio.play('fire');
                 }
-            }
+            } 
+            // События бонусов
             else if (e.type === 'BONUS_SPAWN') audio.play('bonus_appear');
             else if (e.type === 'BONUS_TAKEN') audio.play('bonus_take');
             else if (e.type === 'LIFE_UP') audio.play('life_up');
-            else if (e.type === 'GRENADE_EXPLODE') {
-                audio.play('explosion_bot');
-                audio.play('explosion_bot');
-            }
+            else if (e.type === 'GRENADE_EXPLODE') audio.play('explosion_bot');
         });
     }
 });

@@ -2,17 +2,56 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Tank 1990 Web</title>
+    <title>Tank 1990 Online</title>
     <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script> 
+    <!-- Шрифт Press Start 2P для атмосферы (с Google Fonts) -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <div id="game-container">
-        <!-- Оригинальное разрешение NES: 256x240 -->
-        <!-- Мы увеличим его в 2 или 3 раза через CSS, чтобы не было мелко -->
-        <canvas id="gameCanvas" width="256" height="240"></canvas>
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- МЕНЮ -->
+        <div id="menu-screen">
+            <h1 class="title">TANK 1990 <br><span style="font-size: 0.5em; color: #a42020;">ONLINE</span></h1>
+    
+            <div class="menu-actions">
+                <button onclick="createRoom()">CREATE ROOM</button>
+                <div class="join-row">
+                    <input type="text" id="room-code" placeholder="ROOM ID" maxlength="5">
+                    <button onclick="joinRoom()">JOIN</button>
+                </div>
+            </div>
+
+            <div id="status-msg"></div>
+        </div>
+
+        <!-- ЛОББИ (Ожидание) -->
+        <div id="lobby-screen" style="display: none;">
+            <h2>ROOM: <span id="display-room-id" style="color: #63db44;">???</span></h2>
+            
+            <!-- БЛОК НАСТРОЕК -->
+            <div class="lobby-settings">
+                <label>
+                    LEVEL:
+                    <input type="number" id="opt-level" min="1" max="35" value="1" onchange="changeSettings()">
+                </label>
+                <br>
+                <label>
+                    <input type="checkbox" id="opt-bots" checked onchange="changeSettings()">
+                    ENEMY BOTS
+                </label>
+            </div>
+
+            <div id="lobby-players"></div>
+            <button id="btn-start" onclick="startGame()" style="display: none;">START GAME</button>
+        </div>
     </div>
+
     <!-- Скрипты -->
+    <!-- Сначала грузим menu.js (его создадим), потом game.js -->
+    <script src="src/menu.js"></script>
     <script type="module" src="src/game.js"></script>
 </body>
 </html>
