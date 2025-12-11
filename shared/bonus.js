@@ -1,4 +1,4 @@
-import { TILE_SIZE, BONUS_WEIGHTS, MAP_WIDTH, MAP_HEIGHT } from '../shared/config.js';
+import { TILE_SIZE, BONUS_WEIGHTS, MAP_WIDTH, MAP_HEIGHT } from './config.js';
 import { checkRectOverlap } from './utils.js';
 
 let activeBonus = null; // Объект { x, y, type }
@@ -43,14 +43,29 @@ export function clearBonus() {
     activeBonus = null;
 }
 
-// Проверяет, взял ли игрок бонус
-export function checkBonusCollection(player) {
-    if (!activeBonus) return null;
+export function createRandomBonus(x, y) {
+    if (x === undefined || y === undefined) {
+        const cols = Math.floor(MAP_WIDTH / TILE_SIZE) - 2;
+        const rows = Math.floor(MAP_HEIGHT / TILE_SIZE) - 2;
+        x = (Math.floor(Math.random() * cols) + 1) * TILE_SIZE;
+        y = (Math.floor(Math.random() * rows) + 1) * TILE_SIZE;
+    }
 
-    if (checkRectOverlap(player, activeBonus)) {
-        const type = activeBonus.type;
-        activeBonus = null; 
-        return type;
+    return {
+        id: Date.now() + Math.random(), // Уникальный ID
+        type: getRandomBonusType(),
+        x: x,
+        y: y,
+        width: 16, height: 16,
+        timer: 0 
+    };
+}
+
+// Проверяет, взял ли игрок бонус
+export function checkBonusCollection(player, bonus) {
+    if (!bonus) return null;
+    if (checkRectOverlap(player, bonus)) {
+        return bonus.type;
     }
     return null;
 }

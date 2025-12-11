@@ -35,6 +35,14 @@ game.sprites.src = './assets/sprites.png';
 
 let lastBonusId = null;
 
+let myId = null;
+socket.on('connect', () => {
+    console.log("Connected:", socket.id);
+    myId = socket.id;
+    
+    socket.emit('join_game', { count: 2 });
+});
+
 socket.on('state', (state) => {
     // 1. Обновление стейта
     serverState.players = state.players;
@@ -60,7 +68,10 @@ socket.on('state', (state) => {
         state.events.forEach(e => {
             if (e.type === 'WALL_HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
-                audio.play('miss_hit');
+
+                if (e.ownerId && e.ownerId.startsWith(myId)) {
+                    audio.play('miss_hit');
+                }
             }
             else if (e.type === 'SHIELD_HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
@@ -68,24 +79,38 @@ socket.on('state', (state) => {
             }
             else if (e.type === 'HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
-                if (e.isSteel) audio.play('concrete_hit');
-                else audio.play('brick_hit');
+                if (e.ownerId && e.ownerId.startsWith(myId)) {
+                    if (e.isSteel) audio.play('concrete_hit');
+                    else audio.play('brick_hit');
+                }
             }
             else if (e.type === 'TANK_EXPLODE') {
-                createExplosion(e.x, e.y, EXPLOSION_BIG);
-                // Как узнать, кто умер, по координатам сложно.
-                // Проще играть дефолтный взрыв или сервер должен слать 'explosion_bot'/'explosion_player' в типе события.
-                // Пока общий:
-                audio.play('explosion');
+                if (e.isPlayer) {
+                     createExplosion(e.x, e.y, EXPLOSION_BIG);
+                    audio.play('explosion_player')
+                } else {
+                    createExplosion(e.x, e.y, EXPLOSION_BIG);
+                    audio.play('explosion_bot');
+                }
             }
             else if (e.type === 'BASE_DESTROY') {
                 createExplosion(e.x, e.y, EXPLOSION_BIG);
                 audio.play('base_crash');
-                audio.play('game_over'); // Можно тут
+                audio.play('game_over');
             }
             else if (e.type === 'ARMOR_HIT') {
-                createExplosion(e.x, e.y, EXPLOSION_SMALL);
                 audio.play('armor_hit');
+            } else if (e.type === 'PLAYER_FIRE') {
+                if (e.ownerId && e.ownerId.startsWith(myId)) {
+                    audio.play('fire');
+                }
+            }
+            else if (e.type === 'BONUS_SPAWN') audio.play('bonus_appear');
+            else if (e.type === 'BONUS_TAKEN') audio.play('bonus_take');
+            else if (e.type === 'LIFE_UP') audio.play('life_up');
+            else if (e.type === 'GRENADE_EXPLODE') {
+                audio.play('explosion_bot');
+                audio.play('explosion_bot');
             }
         });
     }
@@ -98,18 +123,30 @@ function loop() {
 }
 
 function update() {
-    // Input
-    const input = {
-        up: game.input.keys['KeyW'] || game.input.keys['ArrowUp'],
-        down: game.input.keys['KeyS'] || game.input.keys['ArrowDown'],
-        left: game.input.keys['KeyA'] || game.input.keys['ArrowLeft'],
-        right: game.input.keys['KeyD'] || game.input.keys['ArrowRight'],
-        fire: game.input.keys['Space'] || game.input.keys['Enter'],
+    const inputs = {};
+
+    // P1: WASD / Space
+    inputs[0] = {
+        up: game.input.keys['KeyW'],
+        down: game.input.keys['KeyS'],
+        left: game.input.keys['KeyA'],
+        right: game.input.keys['KeyD'],
+        fire: game.input.keys['Space'],
         cheat0: game.input.keys['Digit0']
     };
-    socket.emit('input', input);
 
-    updateExplosions(); // Анимация
+    // P2: Arrows / Enter
+    inputs[1] = {
+        up: game.input.keys['ArrowUp'],
+        down: game.input.keys['ArrowDown'],
+        left: game.input.keys['ArrowLeft'],
+        right: game.input.keys['ArrowRight'],
+        fire: game.input.keys['Enter'],
+        cheat0: false // Чит только у P1
+    };
+
+    socket.emit('input', inputs);
+    updateExplosions();
 }
 
 function draw() {

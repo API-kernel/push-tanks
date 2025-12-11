@@ -1,9 +1,8 @@
-import { TILE_SIZE } from '../shared/config.js';
-import { level1 } from './level.js';
+import { TILE_SIZE } from './config.js';
+// level1 не импортируем! Карта передается аргументом.
 
-export const bullets = [];
-
-export function createBullet(shooter) {
+// Создает пулю и добавляет в массив bulletsList
+export function createBullet(shooter, bulletsList, map) {
     let x = shooter.x + TILE_SIZE / 2;
     let y = shooter.y + TILE_SIZE / 2;
 
@@ -25,19 +24,20 @@ export function createBullet(shooter) {
         width: 4, height: 4
     };
 
-    checkCollisionAndDestroy(b);
-    bullets.push(b);
+    // Сразу проверяем коллизию (для упора)
+    checkCollisionAndDestroy(b, map);
+    bulletsList.push(b);
 }
 
-export function updateBullets(gameWidth, gameHeight) {
-    // Возвращаем список событий, произошедших в этом кадре (Взрывы, удары)
+// Принимает: bulletsList, map
+export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
     const events = [];
 
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
+    for (let i = bulletsList.length - 1; i >= 0; i--) {
+        const b = bulletsList[i];
 
         if (b.isDead) {
-            bullets.splice(i, 1);
+            bulletsList.splice(i, 1);
             continue;
         }
 
@@ -50,17 +50,14 @@ export function updateBullets(gameWidth, gameHeight) {
             b.x += stepX;
             b.y += stepY;
 
-            // Вылет за карту
             if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
                 b.isDead = true;
-                // Событие взрыва (на клиенте нарисуем и сыграем звук)
                 events.push({ type: 'WALL_HIT', x: b.x, y: b.y, ownerId: b.ownerId });
                 break;
             }
 
-            const collisionResult = checkCollisionAndDestroy(b);
+            const collisionResult = checkCollisionAndDestroy(b, map); // Передаем map!
             if (collisionResult) {
-                // Если было попадание - добавляем событие
                 events.push({ 
                     type: 'HIT', 
                     x: b.x, y: b.y, 
@@ -80,8 +77,8 @@ function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
-// Возвращает тип удара ('BRICK', 'STEEL', 'BASE_WALL') или false
-function checkCollisionAndDestroy(bullet) {
+// Принимает map
+function checkCollisionAndDestroy(bullet, map) {
     if (bullet.isDead) return false;
 
     let hitDetected = false;
@@ -97,8 +94,8 @@ function checkCollisionAndDestroy(bullet) {
 
     for (let row = startRow; row <= endRow; row++) {
         for (let col = startCol; col <= endCol; col++) {
-            if (row >= 0 && row < level1.length && col >= 0 && col < level1[0].length) {
-                let block = level1[row][col];
+            if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
+                let block = map[row][col];
                 if (typeof block !== 'object' || block.mask === 0) continue; 
 
                 for (let r = 0; r < 4; r++) {
@@ -131,7 +128,6 @@ function checkCollisionAndDestroy(bullet) {
 
     if (!hitDetected) return false;
 
-    // ЗАЩИТА ОТ СВОИХ
     if (bullet.ownerId >= 1000) {
         const bRow = Math.floor(bullet.y / TILE_SIZE);
         const bCol = Math.floor(bullet.x / TILE_SIZE);
@@ -146,9 +142,9 @@ function checkCollisionAndDestroy(bullet) {
     }
 
     bullet.isDead = true;
-    if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL'; // Бетон не пробит
+    if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL';
 
-    // --- РАЗРУШЕНИЕ ---
+    // --- DESTRUCTION LOGIC ---
     const cx = bullet.x + bullet.width / 2;
     const cy = bullet.y + bullet.height / 2;
     const lateralSnap = isSteelHit ? 8 : 4;
@@ -196,8 +192,8 @@ function checkCollisionAndDestroy(bullet) {
 
     for (let row = dStartRow; row <= dEndRow; row++) {
         for (let col = dStartCol; col <= dEndCol; col++) {
-            if (row >= 0 && row < level1.length && col >= 0 && col < level1[0].length) {
-                let block = level1[row][col];
+            if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
+                let block = map[row][col];
                 
                 if (typeof block === 'object' && block.mask > 0) {
                     if (block.type === 2 && bullet.ownerLevel < 4) continue;
@@ -234,7 +230,7 @@ function checkCollisionAndDestroy(bullet) {
                             }
                         }
                     }
-                    if (block.mask === 0) level1[row][col] = 0;
+                    if (block.mask === 0) map[row][col] = 0;
                 }
             }
         }

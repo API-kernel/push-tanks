@@ -1,7 +1,8 @@
-import { TILE_SIZE } from '../shared/config.js';
+import { TILE_SIZE } from './config.js';
 import { canMoveTo } from './physics.js';
 
-export function updateTankMovement(tank, direction, gameWidth, gameHeight, onCheckCollision) {
+// Добавляем аргумент map!
+export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, onCheckCollision) {
     if (!direction) {
         tank.isMoving = false;
         return false;
@@ -27,7 +28,8 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, onChe
         return false;
     }
 
-    if (!canMoveTo(nextX, nextY)) {
+    // Передаем map в canMoveTo
+    if (!canMoveTo(nextX, nextY, map)) {
         tank.isMoving = false;
         return false;
     }
@@ -40,7 +42,6 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, onChe
     tank.x = nextX;
     tank.y = nextY;
 
-    // Анимация (серверу она не нужна для физики, но пусть считает кадры, чтобы синхронизировать их)
     tank.frameTimer++;
     const animThreshold = (tank.speed > 0.8) ? 4 : 8;
     if (tank.frameTimer > animThreshold) {

@@ -1,8 +1,7 @@
-import { TILE_SIZE, SPAWN_COLUMNS, TEAMS_CONFIG } from '../shared/config.js';
-import { level1 } from './level.js';
-import { BASE_WALLS } from '../shared/config.js';
+import { TILE_SIZE, SPAWN_COLUMNS, TEAMS_CONFIG } from './config.js';
+import { BASE_WALLS } from './config.js';
 
-class TeamManager {
+export class TeamManager {
     constructor() {
         this.teams = {};
         TEAMS_CONFIG.forEach(cfg => {
@@ -39,7 +38,7 @@ class TeamManager {
         if (this.teams[teamId]) this.teams[teamId].baseAlive = false;
     }
 
-    fortifyBase(teamId, isSteel) {
+    fortifyBase(teamId, isSteel, map) {
         const team = this.teams[teamId];
         if (!team || !team.baseAlive) return;
 
@@ -47,8 +46,8 @@ class TeamManager {
         const newType = isSteel ? 2 : 1; 
 
         walls.forEach(w => {
-            if (level1[w.r] && level1[w.r][w.c] !== undefined) {
-                level1[w.r][w.c] = {
+            if (map[w.r] && map[w.r][w.c] !== undefined) {
+                map[w.r][w.c] = {
                     type: newType,
                     mask: w.mask 
                 };
