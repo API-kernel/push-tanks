@@ -15,45 +15,33 @@ const io = new Server(httpServer);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 
-// Хранилище комнат { "ABCD": GameRoomInstance }
+// Хранилище комнат { "ABCD": GameRoom }
 const rooms = {};
 
-// Хелпер: Генерация ID комнаты (4 буквы)
+// Хелпер: Генерация ID комнаты
 function generateRoomId() {
     return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+    
+    // Переменная, хранящая ID комнаты для ЭТОГО сокета
     let currentRoomId = null;
 
-    // --- ЛОББИ СОБЫТИЯ ---
+    // --- ЛОББИ ---
 
-    // 1. Создать Комнату
+    // 1. Создать комнату
     socket.on('create_room', (config) => {
-        // config = { localCount: 1 or 2 }
         const roomId = generateRoomId();
         const room = new GameRoom(roomId, io);
-        
         rooms[roomId] = room;
-        currentRoomId = roomId;
         
-        socket.join(roomId);
-        
-        // Добавляем игроков хоста
-        const count = config.localCount || 1;
-        for(let i=0; i<count; i++) room.addPlayer(socket.id, i);
-
-        // Сообщаем клиенту: "Ты в комнате ABCD, ты Хост"
-        socket.emit('room_joined', { roomId, isHost: true });
-        
-        // Шлем обновление списка (пока пустое, так как игра не запущена)
-        // Но нам нужно знать список игроков В ЛОББИ.
-        // GameRoom хранит players сразу. Можно слать их.
-        io.to(roomId).emit('lobby_update', { players: room.players });
+        // Вход в комнату (общая логика)
+        joinRoomLogic(socket, roomId, config.localCount || 1, true); // true = isHost
     });
 
-    // 2. Войти в Комнату
+    // 2. Войти в комнату
     socket.on('join_room', (data) => {
         const roomId = data.roomId;
         const room = rooms[roomId];
@@ -63,75 +51,111 @@ io.on('connection', (socket) => {
             return;
         }
         
-        // Если игра уже идет - можно ли войти? (Hot Join)
-        // Да, мы это обсуждали.
+        // Проверка Hot-Join
+        if (room.isRunning && !room.settings.allowHotJoin) {
+            socket.emit('error_msg', "Game in progress (Locked)"); 
+            return;
+        }
         
+        joinRoomLogic(socket, roomId, data.localCount || 1, false);
+    });
+
+    // 3. Quick Play (Матчмейкинг)
+    socket.on('quick_play', (config) => {
+        const localCount = config.localCount || 1;
+        let targetRoomId = null;
+        
+        for (const id in rooms) {
+            const r = rooms[id];
+            const totalPlayers = Object.keys(r.players).length;
+            
+            // Лимиты: < 6 игроков
+            const hasSpace = (totalPlayers + localCount) <= 6;
+            // Можно войти, если лобби ИЛИ если игра идет и разрешен HotJoin
+            const canJoin = !r.isRunning || r.settings.allowHotJoin;
+            
+            if (hasSpace && canJoin) {
+                targetRoomId = id;
+                break;
+            }
+        }
+        
+        if (targetRoomId) {
+            // Нашли существующую -> Входим
+            joinRoomLogic(socket, targetRoomId, localCount, false);
+        } else {
+            // Не нашли -> Создаем новую И СРАЗУ ЗАПУСКАЕМ (true)
+            createRoomLogic(socket, localCount, true);
+        }
+    });
+
+    // Хелпер входа (чтобы не дублировать)
+    function joinRoomLogic(socket, roomId, localCount, isHost) {
         currentRoomId = roomId;
+        const room = rooms[roomId];
         socket.join(roomId);
 
-        const count = data.localCount || 1;
-        for(let i=0; i<count; i++) room.addPlayer(socket.id, i);
+        // Добавляем игроков
+        for(let i=0; i<localCount; i++) {
+            room.addPlayer(socket.id, i);
+        }
 
-        socket.emit('room_joined', { roomId, isHost: false });
-        io.to(roomId).emit('lobby_update', { players: room.players });
+        socket.emit('room_joined', { roomId, isHost });
         
-        // Если игра УЖЕ идет - нужно сразу слать map_init и state
-        // Как узнать, идет ли игра? Добавим флаг isRunning в GameRoom?
-        // Или просто interval запущен всегда? (У нас он запущен в конструкторе).
-        // Значит игра идет всегда. Шлем карту.
         if (room.isRunning) {
-            // Hot Join: Игра идет, сразу кидаем в бой
-            socket.emit('game_start'); // Скрыть меню
+            socket.emit('game_start');
             socket.emit('map_init', room.map);
+            // Шлем апдейт лобби (чтобы обновились списки у других)
+            io.to(roomId).emit('lobby_update', { players: room.players, settings: room.settings });
         } else {
-            // Cold Join: Ждем в лобби
-            // (game_start не шлем, клиент видит экран лобби)
+            io.to(roomId).emit('lobby_update', { players: room.players, settings: room.settings });
         }
-    });
+    }
 
-    // 3. Старт Игры (Например, разморозка или рестарт)
-    socket.on('start_game', () => {
-        if (!currentRoomId || !rooms[currentRoomId]) return;
-        // Тут можно сделать рестарт уровня, чтобы все начали одновременно
-        rooms[currentRoomId].startGame();
-        io.to(currentRoomId).emit('game_start');
-    });
-
-    // --- ИГРОВЫЕ СОБЫТИЯ ---
-
-    socket.on('input', (data) => {
-        if (currentRoomId && rooms[currentRoomId]) {
-            rooms[currentRoomId].handleInput(socket.id, data);
-        }
-    });
-
-    socket.on('disconnect', () => {
-        if (currentRoomId && rooms[currentRoomId]) {
-            rooms[currentRoomId].removePlayer(socket.id);
-            // Если комната пуста - удаляем
-            // Но как проверить? Object.keys(rooms[roomId].players).length
-            // Это сделаем позже для очистки памяти.
-            io.to(currentRoomId).emit('lobby_update', { players: rooms[currentRoomId].players });
-        }
-    });
-
-    socket.on('change_team', (data) => {
-        // data = { localIndex: 0, teamId: 2 }
-        if (!currentRoomId || !rooms[currentRoomId]) return;
+    function createRoomLogic(socket, localCount, autoStart = false) {
+        const roomId = generateRoomId();
+        const room = new GameRoom(roomId, io);
+        rooms[roomId] = room;
         
+        joinRoomLogic(socket, roomId, localCount, true); // true = isHost
+        
+        if (autoStart) {
+            room.startGame();
+        }
+    }
+
+    // 4. Смена Команды
+    socket.on('change_team', (data) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
         const room = rooms[currentRoomId];
         const uniqueId = `${socket.id}_${data.localIndex}`;
         
         if (room.players[uniqueId]) {
             room.players[uniqueId].team = data.teamId;
             
+            // Обновляем направление спавна (для красоты)
             const teamConfig = room.teamManager.getTeam(data.teamId);
             if (teamConfig) room.players[uniqueId].direction = teamConfig.direction;
             
-            io.to(currentRoomId).emit('lobby_update', { players: room.players });
+            // Обновляем позицию спавна (чтобы в лобби знать, но реально применится при рестарте)
+            // Или можно прямо сейчас сдвинуть, если игра не идет?
+            // Давай не будем двигать, пусть при старте расставит.
+            
+            io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
         }
     });
 
+    // 5. Настройки
+    socket.on('update_settings', (data) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        rooms[currentRoomId].updateSettings(data);
+        io.to(currentRoomId).emit('lobby_update', { 
+            players: rooms[currentRoomId].players,
+            settings: rooms[currentRoomId].settings 
+        });
+    });
+
+    // 6. Добавить локального игрока
     socket.on('add_local_player', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const room = rooms[currentRoomId];
@@ -142,33 +166,50 @@ io.on('connection', (socket) => {
         }
         
         if (count < 2) {
-            room.addPlayer(socket.id, count); // count будет 1
-            io.to(currentRoomId).emit('lobby_update', { players: room.players });
+            room.addPlayer(socket.id, count); // count = 1
+            io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
         }
     });
 
+    // 7. Удалить локального игрока
     socket.on('remove_local_player', (localIndex) => {
-            if (!currentRoomId || !rooms[currentRoomId]) return;
-            
-            const room = rooms[currentRoomId];
-            
-            if (localIndex > 0) {
-                room.removeLocalPlayer(socket.id, localIndex);
-                io.to(currentRoomId).emit('lobby_update', { players: room.players });
-            }
-        });
-
-    socket.on('update_settings', (data) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
-        
         const room = rooms[currentRoomId];
         
-        room.updateSettings(data);
-        
-        io.to(currentRoomId).emit('lobby_update', { 
-            players: room.players,
-            settings: room.settings
-        });
+        if (localIndex > 0) {
+            room.removeLocalPlayer(socket.id, localIndex);
+            io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+        }
+    });
+
+    // 8. СТАРТ
+    socket.on('start_game', () => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        rooms[currentRoomId].startGame();
+    });
+
+    // --- GAMEPLAY ---
+
+    socket.on('input', (data) => {
+        if (currentRoomId && rooms[currentRoomId]) {
+            rooms[currentRoomId].handleInput(socket.id, data);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected:', socket.id);
+        if (currentRoomId && rooms[currentRoomId]) {
+            rooms[currentRoomId].removePlayer(socket.id);
+            
+            // Если комната пуста - удаляем (через таймаут или сразу)
+            if (Object.keys(rooms[currentRoomId].players).length === 0) {
+                rooms[currentRoomId].destroy(); // Остановить таймер
+                delete rooms[currentRoomId];
+                console.log("Room destroyed:", currentRoomId);
+            } else {
+                io.to(currentRoomId).emit('lobby_update', { players: rooms[currentRoomId].players, settings: rooms[currentRoomId].settings });
+            }
+        }
     });
 });
 

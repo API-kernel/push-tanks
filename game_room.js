@@ -38,6 +38,7 @@ export class GameRoom {
         this.settings = {
             level: 1,
             botsEnabled: true,
+            allowHotJoin: true,
             friendlyFire: false // Задел на будущее
         };
     }
@@ -407,5 +408,11 @@ export class GameRoom {
             bonus: this.activeBonus,
             settings: this.settings
         });
+    }
+
+    destroy() {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
     }
 }

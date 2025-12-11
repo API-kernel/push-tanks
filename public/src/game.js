@@ -42,6 +42,9 @@ window.tankGame = {
     changeTeam: (localIndex, teamId) => {
         socket.emit('change_team', { localIndex, teamId });
     },
+    quickPlay: (localCount) => {
+        socket.emit('quick_play', { localCount });
+    },
     addLocalPlayer: () => socket.emit('add_local_player'),
     removeLocalPlayer: (idx) => socket.emit('remove_local_player', idx),
     updateSettings: (settings) => socket.emit('update_settings', settings)
@@ -84,6 +87,11 @@ game.sprites.src = './assets/sprites.png';
 let lastBonusId = null;
 
 let myId = null;
+
+if (socket.connected) {
+    window.setMyId(socket.id);
+}
+
 socket.on('connect', () => {
     console.log("Connected:", socket.id);
     myId = socket.id;

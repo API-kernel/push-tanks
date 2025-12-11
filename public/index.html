@@ -15,8 +15,11 @@
         <!-- МЕНЮ -->
         <div id="menu-screen">
             <h1 class="title">TANK 1990 <br><span style="font-size: 0.5em; color: #a42020;">ONLINE</span></h1>
-    
+
             <div class="menu-actions">
+                <button onclick="quickPlay()" style="border-color: #63db44; color: #63db44;">QUICK PLAY</button> 
+                <br><br>
+
                 <button onclick="createRoom()">CREATE ROOM</button>
                 <div class="join-row">
                     <input type="text" id="room-code" placeholder="ROOM ID" maxlength="5">
@@ -41,6 +44,10 @@
                 <label>
                     <input type="checkbox" id="opt-bots" checked onchange="changeSettings()">
                     ENEMY BOTS
+                </label>
+                <label>
+                    <input type="checkbox" id="opt-hotjoin" checked onchange="changeSettings()">
+                    ALLOW JOIN IN GAME
                 </label>
             </div>
 

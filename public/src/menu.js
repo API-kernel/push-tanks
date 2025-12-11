@@ -1,11 +1,6 @@
 let localPlayersCount = 1;
 let isMyHost = false;
 
-// Инициализация UI
-window.onload = () => {
-    selectLocalPlayers(1);
-};
-
 let mySocketId = null; // Нужно сохранить ID сокета (передадим из game.js)
 
 // Вызывается из game.js при подключении
@@ -13,6 +8,7 @@ window.setMyId = (id) => { mySocketId = id; };
 
 // Функция смены команды (отправляет на сервер)
 window.changeTeam = (localIndex, teamId) => {
+    console.log("Clicked!");
     if (window.tankGame) window.tankGame.changeTeam(localIndex, teamId);
 };
 
@@ -108,12 +104,6 @@ window.removeLocalPlayer = (idx) => {
     if (window.tankGame) window.tankGame.removeLocalPlayer(idx);
 };
 
-function selectLocalPlayers(n) {
-    localPlayersCount = n;
-    document.getElementById('btn-1p').classList.toggle('selected', n === 1);
-    document.getElementById('btn-2p').classList.toggle('selected', n === 2);
-}
-
 function createRoom() {
     // Вызываем функцию из game.js (нам нужно экспортировать её или повесить на window)
     // Так как game.js - модуль, мы не можем просто вызвать функцию оттуда.
@@ -135,6 +125,7 @@ function joinRoom() {
 }
 
 function startGame() {
+    console.log("Clicked!");
     if (window.tankGame) {
         window.tankGame.requestStart();
     }
@@ -142,6 +133,7 @@ function startGame() {
 
 // Функции для управления экранами (вызываются из game.js)
 window.showLobby = (roomId, isHost) => {
+    console.log("Show Lobby. Host:", isHost);
     isMyHost = isHost;
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('lobby-screen').style.display = 'flex';
@@ -155,4 +147,50 @@ window.showLobby = (roomId, isHost) => {
 window.hideMenu = () => {
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('lobby-screen').style.display = 'none';
+};
+
+function quickPlay() {
+    if (window.tankGame) {
+        window.tankGame.quickPlay(localPlayersCount);
+    }
+}
+
+function changeSettings() {
+    if (!isMyHost) return;
+
+    const level = parseInt(document.getElementById('opt-level').value);
+    const bots = document.getElementById('opt-bots').checked;
+    const hotjoin = document.getElementById('opt-hotjoin').checked; // Новая галочка
+
+    if (window.tankGame) {
+        window.tankGame.updateSettings({ 
+            level, 
+            botsEnabled: bots,
+            allowHotJoin: hotjoin 
+        });
+    }
+}
+
+window.updateLobbyUI = (data) => {
+    updateLobbyList(data.players);
+
+    if (data.settings) {
+        const lvlInput = document.getElementById('opt-level');
+        const botsInput = document.getElementById('opt-bots');
+        const hotjoinInput = document.getElementById('opt-hotjoin'); // Новая галочка
+
+        if (!isMyHost) {
+            lvlInput.value = data.settings.level;
+            botsInput.checked = data.settings.botsEnabled;
+            hotjoinInput.checked = data.settings.allowHotJoin;
+            
+            lvlInput.disabled = true;
+            botsInput.disabled = true;
+            hotjoinInput.disabled = true;
+        } else {
+            lvlInput.disabled = false;
+            botsInput.disabled = false;
+            hotjoinInput.disabled = false;
+        }
+    }
 };
