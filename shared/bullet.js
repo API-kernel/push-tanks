@@ -1,7 +1,7 @@
 import { TILE_SIZE } from './config.js';
-// level1 не импортируем! Карта передается аргументом.
 
-// Создает пулю и добавляет в массив bulletsList
+export const bullets = [];
+
 export function createBullet(shooter, bulletsList, map) {
     let x = shooter.x + TILE_SIZE / 2;
     let y = shooter.y + TILE_SIZE / 2;
@@ -24,12 +24,9 @@ export function createBullet(shooter, bulletsList, map) {
         width: 4, height: 4
     };
 
-    // Сразу проверяем коллизию (для упора)
-    checkCollisionAndDestroy(b, map);
     bulletsList.push(b);
 }
 
-// Принимает: bulletsList, map
 export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
     const events = [];
 
@@ -47,25 +44,29 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
         const stepY = (b.direction === 'UP' ? -b.speed : (b.direction === 'DOWN' ? b.speed : 0)) / steps;
 
         for (let s = 0; s < steps; s++) {
-            b.x += stepX;
-            b.y += stepY;
-
-            if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
-                b.isDead = true;
-                events.push({ type: 'WALL_HIT', x: b.x, y: b.y, ownerId: b.ownerId });
-                break;
-            }
-
-            const collisionResult = checkCollisionAndDestroy(b, map); // Передаем map!
+            // Если пуля уже в стене (сразу после рождения или предыдущего шага)
+            let collisionResult = checkCollisionAndDestroy(b, map);
             if (collisionResult) {
                 events.push({ 
                     type: 'HIT', 
                     x: b.x, y: b.y, 
                     ownerId: b.ownerId,
                     isSteel: collisionResult === 'STEEL',
+                    isSteelNoDmg: collisionResult === 'STEEL_NO_DMG',
                     level: b.ownerLevel
                 });
-                break; 
+                break; // Выход из шагов
+            }
+
+            // --- ДВИЖЕНИЕ ---
+            b.x += stepX;
+            b.y += stepY;
+
+            // Проверка границ
+            if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
+                b.isDead = true;
+                events.push({ type: 'WALL_HIT', x: b.x, y: b.y, ownerId: b.ownerId });
+                break;
             }
         }
     }
@@ -142,7 +143,7 @@ function checkCollisionAndDestroy(bullet, map) {
     }
 
     bullet.isDead = true;
-    if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL';
+    if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL_NO_DMG';
 
     // --- DESTRUCTION LOGIC ---
     const cx = bullet.x + bullet.width / 2;

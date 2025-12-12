@@ -55,7 +55,7 @@ export const BONUS_WEIGHTS = {
 };
 
 export const HELMET_DURATION = 300; 
-export const SHOVEL_DURATION = 900;
+export const SHOVEL_DURATION = 1000;
 export const CLOCK_DURATION  = 600;
 
 // Маски стен

@@ -91,24 +91,47 @@ export function drawBullets(ctx, spritesImage, bullets) {
     });
 }
 
-export function drawEnemies(ctx, spritesImage, enemies) {
-    if (!enemies) return;
-    enemies.forEach(enemy => {
-        const frames = SPRITES[enemy.spriteKey];
-        if (frames) {
-            const idx = enemy.frameIndex || 0;
-            const frame = frames[idx];
+export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
+
+    if (pendingSpawns) {
+        pendingSpawns.forEach(s => {
+            const idx = s.frameIndex || 0;
+            const frame = SPRITES.spawn_appear[idx];
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
-                drawRotated(
-                    ctx, spritesImage, 
-                    sx, sy, sw, sh, 
-                    Math.round(enemy.x), Math.round(enemy.y), TILE_SIZE, TILE_SIZE,
-                    enemy.direction
-                );
+                ctx.drawImage(spritesImage, sx, sy, sw, sh, s.x, s.y, TILE_SIZE, TILE_SIZE);
             }
-        }
-    });
+        });
+    }
+
+    if (enemies) {
+        enemies.forEach(enemy => {
+            let key = enemy.spriteKey; // 'enemy_basic'
+            if (enemy.isBonus) {
+                // Мигание каждые 10 кадров (быстро)
+                const blink = Math.floor(Date.now() / 150) % 2;
+                if (blink === 0) {
+                    key += '_red'; // Красная версия
+                }
+                // Иначе (blink===1) рисуем обычную (белую) версию
+            }
+
+            const frames = SPRITES[key] || SPRITES[enemy.spriteKey];
+            if (frames) {
+                const idx = enemy.frameIndex || 0;
+                const frame = frames[idx];
+                if (frame) {
+                    const [sx, sy, sw, sh] = frame;
+                    drawRotated(
+                        ctx, spritesImage, 
+                        sx, sy, sw, sh, 
+                        Math.round(enemy.x), Math.round(enemy.y), TILE_SIZE, TILE_SIZE,
+                        enemy.direction
+                    );
+                }
+            }
+        });
+    }
 }
 
 export function drawPlayers(ctx, spritesImage, playersMap) {
@@ -127,7 +150,10 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
             }
         } else {
             // Танк
-            const frames = SPRITES.player;
+            const lvl = p.level || 1;
+            const key = `player_lvl${lvl}`;
+            const frames = SPRITES[key] || SPRITES.player_lvl1;
+
             if (frames) {
                 const idx = p.frameIndex || 0;
                 const frame = frames[idx];

@@ -1,10 +1,9 @@
 import { SPAWN_DELAY, TANK_STATS  } from './config.js';
-import { canMoveTo } from './physics.js';
 import { createBullet } from './bullet.js';
 import { destroyBlockAt } from './level.js';
 import { updateTankMovement } from './tank.js';
+import { spawnBonus } from './bonus.js';
 
-const SPAWN_COLS = [0, 4, 8, 12];
 
 const ENEMY_TYPES = [
     { type: 'basic', spriteKey: 'enemy_basic', ...TANK_STATS.basic, bulletLvl: 1 },
@@ -14,55 +13,66 @@ const ENEMY_TYPES = [
 
 export function hitEnemy(room, index) {
     const enemy = room.enemies[index];
+    const result = { isDead: false, bonusDropped: false };
+
+    if (enemy.isBonus) {
+        room.activeBonus = spawnBonus(); 
+        result.bonusDropped = true;
+    }
+
     enemy.hp--;
     if (enemy.hp <= 0) {
         room.enemies.splice(index, 1);
-        return true; 
+        result.isDead = true;
     }
-    return false; 
+    return result;
 }
 
 // ГЛАВНАЯ ФУНКЦИЯ
 // room - это объект GameRoom (содержит enemies, pendingSpawns, map, teamManager и т.д.)
 export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, playerCounts, clockActiveTeam) {
-    
     // 1. СПАВН
     const teams = room.teamManager.getTeams();
-    if (room.settings && room.settings.botsEnabled) {
-        const teams = room.teamManager.getTeams();
-        teams.forEach(team => {
-            // Инициализируем таймер в комнате, если нет
-            if (room.teamSpawnTimers[team.id] === undefined) room.teamSpawnTimers[team.id] = 0;
+    teams.forEach(team => {
+        // Инициализируем таймер в комнате, если нет
+        if (room.teamSpawnTimers[team.id] === undefined) room.teamSpawnTimers[team.id] = 0;
 
-            const activeCount = (playerCounts[team.id] || 0) + 
-                                room.enemies.filter(e => e.team === team.id).length + 
-                                room.pendingSpawns.filter(s => s.team === team.id).length;
+        // ЛИМИТ РЕЗЕРВА
+        const spawned = room.botsSpawnedCount[team.id] || 0;
+        const total = room.settings.botsReserve[team.id] || 0;
 
-            // Используем лимит из менеджера
-            if (activeCount < room.teamManager.getMaxUnits(team.id)) {
-                room.teamSpawnTimers[team.id]++;
-                if (room.teamSpawnTimers[team.id] > SPAWN_DELAY) {
-                    // Собираем всех занятых (танки + звездочки)
-                    // allTanks передается? Нет, берем из room.enemies + room.players
-                    // Но onCheckCollision уже проверяет игроков и врагов.
-                    // Для спавна нам нужны координаты.
-                    const busyEntities = [...Object.values(room.players), ...room.enemies, ...room.pendingSpawns];
-                    
-                    const point = room.teamManager.getSpawnPoint(team.id, busyEntities);
-                    
-                    if (point) {
-                        createSpawnAnimation(room, team.id, point.x, point.y);
-                        room.teamSpawnTimers[team.id] = 0;
-                    }
+        if (spawned >= total) return;
+
+        const activeCount = (playerCounts[team.id] || 0) + 
+                            room.enemies.filter(e => e.team === team.id).length + 
+                            room.pendingSpawns.filter(s => s.team === team.id).length;
+
+        if (activeCount < room.settings.maxActiveEnemies) {
+            room.teamSpawnTimers[team.id]++;
+            if (room.teamSpawnTimers[team.id] > SPAWN_DELAY) {
+                const busyEntities = [...Object.values(room.players), ...room.enemies, ...room.pendingSpawns];
+                
+                const point = room.teamManager.getSpawnPoint(team.id, busyEntities);
+                if (point) {
+                    createSpawnAnimation(room, team.id, point.x, point.y);
+                    room.teamSpawnTimers[team.id] = 0;
+
+                    if (!room.botsSpawnedCount[team.id]) room.botsSpawnedCount[team.id] = 0;
+                    room.botsSpawnedCount[team.id]++;
                 }
             }
-        });
-    }
+        }
+    });
 
     // 2. ЗВЕЗДОЧКИ
     for (let i = room.pendingSpawns.length - 1; i >= 0; i--) {
         const s = room.pendingSpawns[i];
         s.timer++;
+        if (s.timer % 4 === 0) {
+            s.frameIndex++;
+            if (s.frameIndex >= 4) s.frameIndex = 0;
+        }
+
         if (s.timer > 60) { 
             spawnTankFromStar(room, s);
             room.pendingSpawns.splice(i, 1);
@@ -98,7 +108,7 @@ export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, pla
 }
 
 function createSpawnAnimation(room, teamId, x, y) {
-    room.pendingSpawns.push({ x, y, team: teamId, timer: 0 });
+    room.pendingSpawns.push({ x, y, team: teamId, timer: 0, frameIndex: 0 });
 }
 
 function spawnTankFromStar(room, star) {
@@ -113,7 +123,7 @@ function spawnTankFromStar(room, star) {
     const startDir = teamConfig ? teamConfig.direction : 'DOWN';
 
     // Шанс бонуса
-    const isBonus = Math.random() < 0.15;
+    const isBonus = Math.random() < 0.2;
 
     room.enemies.push({
         id: room.enemyIdCounter++,

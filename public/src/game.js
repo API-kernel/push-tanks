@@ -54,7 +54,8 @@ window.tankGame = {
 
 socket.on('room_joined', (data) => {
     console.log("Joined Room:", data.roomId);
-    // Показываем экран лобби
+    currentRoomId = data.roomId;
+    amIHost = data.isHost;
     if (window.showLobby) window.showLobby(data.roomId, data.isHost);
 });
 
@@ -65,10 +66,10 @@ socket.on('lobby_update', (data) => {
 
 socket.on('game_start', () => {
     console.log("Game Started!");
-    // Скрываем меню, показываем игру
     if (window.hideMenu) window.hideMenu();
     // Фокус на игру (чтобы клавиши работали)
     window.focus();
+    audio.play('intro');
 });
 
 socket.on('error_msg', (msg) => {
@@ -78,6 +79,16 @@ socket.on('error_msg', (msg) => {
 socket.on('lobby_update', (data) => {
     // Теперь вызываем updateLobbyUI вместо updateLobbyList
     if (window.updateLobbyUI) window.updateLobbyUI(data);
+});
+
+let currentRoomId = "";
+let amIHost = false;
+socket.on('return_to_lobby', () => {
+    console.log("Back to Lobby");
+    if (window.showLobby) {
+        window.showLobby(currentRoomId, amIHost); 
+    }
+    serverState.map = null; // Очищаем карту
 });
 
 // ... (код загрузки спрайтов и socket.on connect/map_init тот же) ...
@@ -98,6 +109,8 @@ socket.on('connect', () => {
     window.setMyId(socket.id);
 });
 
+const prevMoving = {};
+
 socket.on('state', (state) => {
     // 1. Обновление стейта
     serverState.players = state.players;
@@ -105,6 +118,8 @@ socket.on('state', (state) => {
     serverState.bullets = state.bullets;
     serverState.bases = state.bases;
     serverState.isGameOver = state.isGameOver;
+    serverState.pendingSpawns = state.pendingSpawns;
+
     if (state.map) serverState.map = state.map;
 
     // 2. Звук Бонуса
@@ -118,9 +133,44 @@ socket.on('state', (state) => {
     }
     serverState.bonus = state.bonus;
 
-    // 3. События (Взрывы и Звуки)
-// ... внутри socket.on('state') ...
+     // МОТОР
+    if (state.isGameOver) {
+        // Глушим всех
+        Object.values(serverState.players).forEach(p => {
+             audio.updateEngine(p.id, false); // false = idle -> pause?
+             audio.stopEngine(p.id);
+        });
+    } else {
+        Object.values(serverState.players).forEach(p => {
+            if (p.socketId === socket.id) {
+                if (!p.isDead && !p.isSpawning) {
+                    audio.updateEngine(p.id, p.isMoving);
+                } else {
+                    audio.stopEngine(p.id);
+                }
+            }
+        });
+    }
 
+    Object.values(state.players).forEach(p => {
+        if (p.socketId === myId) {
+            // ЛЕД
+            const col = Math.floor((p.x + 8) / 16);
+            const row = Math.floor((p.y + 8) / 16);
+            const isIce = state.map && state.map[row] && state.map[row][col] === 5;
+            
+            const wasMoving = prevMoving[p.id] || false;
+            
+            // Старт движения на льду
+            if (!wasMoving && p.isMoving && isIce) {
+                audio.play('ice_skid'); // (добавь в audio.js)
+            }
+            
+            prevMoving[p.id] = p.isMoving;
+        }
+    });
+
+    // 3. События (Взрывы и Звуки)
     if (state.events && state.events.length > 0) {
         state.events.forEach(e => {
             // Хелпер: проверка, мое ли это событие
@@ -138,8 +188,14 @@ socket.on('state', (state) => {
             else if (e.type === 'HIT') {
                 createExplosion(e.x, e.y, EXPLOSION_SMALL);
                 if (isMine) {
-                    if (e.isSteel) audio.play('concrete_hit');
-                    else audio.play('brick_hit');
+                    if (e.isSteel) {
+                        // Разрушил бетон?
+                        audio.play('concrete_hit'); // Или звук разрушения
+                    } else if (e.isSteelNoDmg) {
+                        audio.play('miss_hit'); // Дзынь (не пробил)
+                    } else {
+                        audio.play('brick_hit');
+                    }
                 }
             }
             else if (e.type === 'TANK_EXPLODE') {
@@ -227,7 +283,7 @@ function draw() {
     drawBonus(ctx, game.sprites, serverState.bonus); // <--- Новая функция
 
     drawBullets(ctx, game.sprites, serverState.bullets);
-    drawEnemies(ctx, game.sprites, serverState.enemies);
+    drawEnemies(ctx, game.sprites, serverState.enemies, serverState.pendingSpawns);
     drawPlayers(ctx, game.sprites, serverState.players);
     drawExplosions(ctx, game.sprites);
 
@@ -249,5 +305,12 @@ function draw() {
         // Центр ПОЛЯ, а не экрана
         ctx.fillText("GAME OVER", MAP_WIDTH / 2, MAP_HEIGHT / 2);
         ctx.restore();
+    }
+
+    if (!serverState.isGameOver) {
+        ctx.fillStyle = "black";
+        ctx.font = "8px \"Press Start 2P\""; // Или пиксельный
+        ctx.textAlign = "center";
+        ctx.fillText(`ROOM: ${currentRoomId}`, canvas.width / 2, 20);
     }
 }

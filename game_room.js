@@ -5,7 +5,7 @@ import { updateTankMovement } from './shared/tank.js';
 import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
 import { MAP_WIDTH, MAP_HEIGHT, TANK_STATS, TILE_SIZE } from './shared/config.js';
-import { spawnBonus, getActiveBonus, checkBonusCollection, clearBonus } from './shared/bonus.js';
+import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION } from './shared/config.js';
 
 export class GameRoom {
@@ -30,6 +30,7 @@ export class GameRoom {
         
         this.isGameOver = false;
         this.gameOverTimer = 0;
+        this.botsSpawnedCount = { 1: 0, 2: 0 };
 
         this.resetGame();
 
@@ -37,9 +38,11 @@ export class GameRoom {
 
         this.settings = {
             level: 1,
-            botsEnabled: true,
             allowHotJoin: true,
-            friendlyFire: false // Задел на будущее
+            friendlyFire: false,
+            startLives: 2,
+            maxActiveEnemies: 4,
+            botsReserve: { 1: 20, 2: 20 } 
         };
     }
 
@@ -64,7 +67,9 @@ export class GameRoom {
             x: sp.x, y: sp.y,
             speed: TANK_STATS.player.speed,
             direction: teamConfig ? teamConfig.direction : 'UP',
-            isMoving: false, hp: 1, lives: 3, level: 1,
+            isMoving: false, hp: 1, 
+            lives: this.settings.startLives, 
+            level: 1,
             isDead: false, respawnTimer: 0,
             isSpawning: true, spawnAnimTimer: 0,
             shieldTimer: 180,
@@ -113,7 +118,7 @@ export class GameRoom {
     stopGame() {
         this.isRunning = false;
         if (this.interval) clearInterval(this.interval);
-        // Можно выкинуть игроков обратно в лобби событием 'game_end'
+        this.io.to(this.id).emit('game_end');
     }
 
     handleInput(socketId, data) {
@@ -125,17 +130,26 @@ export class GameRoom {
         }
     }
 
+    stopGameAndReturnToLobby() {
+        this.isRunning = false;
+        if (this.interval) clearInterval(this.interval);
+        this.interval = null;
+        
+        this.io.to(this.id).emit('return_to_lobby');
+        this.io.to(this.id).emit('lobby_update', { players: this.players, settings: this.settings });
+    }
+
     update() {
         if (this.isGameOver) {
             this.gameOverTimer++;
             if (this.gameOverTimer > 300) {
-                this.resetGame();
-                this.io.to(this.id).emit('game_restart'); // Можно добавить это событие
+                this.stopGameAndReturnToLobby()
             }
 
             this.io.to(this.id).emit('state', {
                 players: this.players,
                 enemies: this.enemies,
+                pendingSpawns: this.pendingSpawns,
                 bullets: this.bullets,
                 events: [],
                 map: this.map,
@@ -149,14 +163,6 @@ export class GameRoom {
 
         this.bulletEvents = [];
 
-        if (this.effectTimers.clock > 0) this.effectTimers.clock--;
-        if (this.effectTimers.shovel > 0) {
-            this.effectTimers.shovel--;
-            if (this.effectTimers.shovel === 0) {
-                this.teamManager.fortifyBase(this.effectTimers.shovelTeam, false, this.map);
-            }
-        }
-
         // 1. ИГРОКИ
         for (const id in this.players) {
             this.updatePlayer(this.players[id]);
@@ -167,11 +173,8 @@ export class GameRoom {
         this.teamManager.getTeams().forEach(t => playerCounts[t.id] = 0);
         Object.values(this.players).forEach(p => { if(!p.isDead) playerCounts[p.team]++; });
         
-        // ВАЖНО: Мы больше не собираем allEntities тут, так как updateEnemies сам собирает 
-        // busyEntities внутри из room.players и room.enemies.
-        // Но нам нужно передать clockActiveTeam
+        if (this.effectTimers.clock > 0) this.effectTimers.clock--;
         const clockActiveTeam = (this.effectTimers.clock > 0) ? this.effectTimers.clockTeam : null;
-        
         updateEnemies(this, MAP_WIDTH, MAP_HEIGHT, this.checkGlobalCollision.bind(this), playerCounts, clockActiveTeam);
 
         // 3. ПУЛИ
@@ -183,6 +186,24 @@ export class GameRoom {
 
         // 5. ОТПРАВКА
         this.broadcastState();
+
+        // --- МИГАНИЕ СТЕН (Лопата заканчивается) ---
+        if (this.effectTimers.shovel > 0) {
+            this.effectTimers.shovel--;
+            
+            if (this.effectTimers.shovel < 180) {
+                // Мигаем каждые 30 кадров (0.5 сек)
+                if (this.effectTimers.shovel % 30 === 0) {
+                    const phase = Math.floor(this.effectTimers.shovel / 30) % 2;
+                    const isSteel = (phase === 0);
+                    this.teamManager.fortifyBase(this.effectTimers.shovelTeam, isSteel, this.map);
+                }
+            }
+            
+            if (this.effectTimers.shovel === 0) {
+                this.teamManager.fortifyBase(this.effectTimers.shovelTeam, false, this.map);
+            }
+        }
     }
 
     updatePlayer(p) {
@@ -231,11 +252,7 @@ export class GameRoom {
         else if (input.left) direction = 'LEFT';
         else if (input.right) direction = 'RIGHT';
 
-        if (direction) {
-            updateTankMovement(p, direction, MAP_WIDTH, MAP_HEIGHT, this.map, this.checkGlobalCollision.bind(this));
-        } else {
-            p.isMoving = false;
-        }
+        updateTankMovement(p, direction, MAP_WIDTH, MAP_HEIGHT, this.map, this.checkGlobalCollision.bind(this));
 
         if (p.bulletCooldown > 0) p.bulletCooldown--;
         if (input.fire) {
@@ -291,7 +308,15 @@ export class GameRoom {
                             isDead = true; 
                         } else { 
                             const idx = this.enemies.indexOf(tank);
-                            if (idx !== -1) isDead = hitEnemy(this, idx);
+                            if (idx !== -1) {
+                                const wasBonus = tank.isBonus;
+                                isDead = hitEnemy(this, idx);
+                                
+                                // Если был бонусный и перестал им быть (значит выбили)
+                                if (wasBonus && !tank.isBonus) {
+                                    this.bulletEvents.push({ type: 'BONUS_SPAWN' });
+                                }
+                            }
                         }
 
                         if (isDead) {
@@ -299,7 +324,7 @@ export class GameRoom {
                             if (tank.inputs) {
                                 tank.isDead = true;
                                 tank.lives--;
-                                tank.respawnTimer = 180;
+                                tank.respawnTimer = 90;
                                 tank.x = -1000;
                             }
                         } else {
@@ -384,12 +409,14 @@ export class GameRoom {
         this.isGameOver = false;
         this.gameOverTimer = 0;
         this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
+        this.botsSpawnedCount = { 1: 0, 2: 0 };
         this.teamManager = new TeamManager();
 
         for (const id in this.players) {
             const p = this.players[id];
             p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0;
-            p.lives = 3; p.level = 1;
+            p.lives = this.settings.startLives
+            p.level = 1;
             const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
             p.x = sp.x; p.y = sp.y;
             destroyBlockAt(this.map, p.x, p.y);
@@ -400,6 +427,7 @@ export class GameRoom {
         this.io.to(this.id).emit('state', {
             players: this.players,
             enemies: this.enemies,
+            pendingSpawns: this.pendingSpawns,
             bullets: this.bullets,
             events: this.bulletEvents,
             map: this.map,

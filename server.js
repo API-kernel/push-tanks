@@ -18,9 +18,13 @@ app.use('/shared', express.static(path.join(__dirname, 'shared')));
 // Хранилище комнат { "ABCD": GameRoom }
 const rooms = {};
 
-// Хелпер: Генерация ID комнаты
 function generateRoomId() {
-    return Math.random().toString(36).substring(2, 6).toUpperCase();
+    let result = '';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Без I, O, 0, 1 для читаемости
+    for (let i = 0; i < 3; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result.toUpperCase();
 }
 
 io.on('connection', (socket) => {
@@ -43,11 +47,19 @@ io.on('connection', (socket) => {
 
     // 2. Войти в комнату
     socket.on('join_room', (data) => {
-        const roomId = data.roomId;
-        const room = rooms[roomId];
+        let roomId = (data.roomId || "").toUpperCase();
+        
+        // Валидация длины (макс 5)
+        if (roomId.length > 5) roomId = roomId.substring(0, 5);
+        if (roomId.length < 2) { socket.emit('error_msg', "Invalid ID"); return; }
+        
+        let room = rooms[roomId];
 
         if (!room) {
-            socket.emit('error_msg', "Room not found!");
+            console.log("Room not found, creating:", roomId);
+            room = new GameRoom(roomId, io);
+            rooms[roomId] = room;
+            joinRoomLogic(socket, roomId, data.localCount || 1, true);
             return;
         }
         

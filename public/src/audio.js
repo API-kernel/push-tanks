@@ -2,6 +2,7 @@
 const SOUNDS = {
     base_crash: './assets/base_craash.mp3',
     fire:       './assets/fire.mp3',
+    ice_skid:       './assets/ice_skid.mp3',
     game_over:  './assets/game_over.mp3',
     intro:      './assets/intro.mp3',
     miss_hit:         './assets/miss_hit.mp3',
@@ -84,6 +85,15 @@ class AudioManager {
         
         target.play().catch(e => {});
         s.current = target;
+    }
+
+    stopEngine(playerId) {
+        const s = this.engineSounds[playerId];
+        if (s) {
+            s.idle.pause();
+            s.move.pause();
+            s.current = null;
+        }
     }
 
     stopAll() {

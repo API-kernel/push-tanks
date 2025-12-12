@@ -9,7 +9,8 @@ export class InputHandler {
         ];
 
         window.addEventListener('keydown', (e) => {
-            // e.code дает физический код клавиши (KeyW, ArrowUp, ControlLeft)
+            if (e.target.tagName === 'INPUT') return; 
+
             this.keys[e.code] = true;
             
             if (gameKeys.includes(e.code)) {

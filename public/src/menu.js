@@ -13,13 +13,23 @@ window.changeTeam = (localIndex, teamId) => {
 };
 
 window.changeSettings = () => {
-    if (!isMyHost) return; // Только хост может менять
-
+    if (!isMyHost) return;
     const level = parseInt(document.getElementById('opt-level').value);
-    const bots = document.getElementById('opt-bots').checked;
+    const lives = parseInt(document.getElementById('opt-lives').value);
+    const maxActive = parseInt(document.getElementById('opt-max-active').value);
+    
+    const botsGreen = parseInt(document.getElementById('opt-bots-green').value);
+    const botsRed = parseInt(document.getElementById('opt-bots-red').value);
+    const hotjoin = document.getElementById('opt-hotjoin').checked;
 
     if (window.tankGame) {
-        window.tankGame.updateSettings({ level, botsEnabled: bots });
+        window.tankGame.updateSettings({ 
+            level, 
+            startLives: lives, 
+            maxActiveEnemies: maxActive,
+            botsReserve: { 1: botsGreen, 2: botsRed }, // Передаем объект
+            allowHotJoin: hotjoin 
+        });
     }
 };
 
@@ -32,20 +42,16 @@ window.updateLobbyUI = (data) => {
     // 2. Обновляем Настройки
     if (data.settings) {
         const lvlInput = document.getElementById('opt-level');
-        const botsInput = document.getElementById('opt-bots');
 
         // Если я НЕ хост, я обновляю свои инпуты значениями с сервера
         // Если я ХОСТ, я не обновляю, чтобы курсор не прыгал (хотя можно и обновить)
         if (!isMyHost) {
             lvlInput.value = data.settings.level;
-            botsInput.checked = data.settings.botsEnabled;
             
             // Блокируем для не-хоста
             lvlInput.disabled = true;
-            botsInput.disabled = true;
         } else {
             lvlInput.disabled = false;
-            botsInput.disabled = false;
         }
     }
 };
@@ -165,6 +171,8 @@ function changeSettings() {
     if (window.tankGame) {
         window.tankGame.updateSettings({ 
             level, 
+            startLives: lives, 
+            maxActiveEnemies: maxActive,
             botsEnabled: bots,
             allowHotJoin: hotjoin 
         });
@@ -176,21 +184,25 @@ window.updateLobbyUI = (data) => {
 
     if (data.settings) {
         const lvlInput = document.getElementById('opt-level');
-        const botsInput = document.getElementById('opt-bots');
         const hotjoinInput = document.getElementById('opt-hotjoin'); // Новая галочка
+        const greenInput = document.getElementById('opt-bots-green');
+        const redInput = document.getElementById('opt-bots-red');
 
         if (!isMyHost) {
             lvlInput.value = data.settings.level;
-            botsInput.checked = data.settings.botsEnabled;
             hotjoinInput.checked = data.settings.allowHotJoin;
-            
+            greenInput.value = data.settings.botsReserve[1] || 0;
+            redInput.value = data.settings.botsReserve[2] || 0;
+
             lvlInput.disabled = true;
-            botsInput.disabled = true;
             hotjoinInput.disabled = true;
+            greenInput.disabled = true;
+            redInput.disabled = true;
         } else {
             lvlInput.disabled = false;
-            botsInput.disabled = false;
             hotjoinInput.disabled = false;
+            greenInput.disabled = false;
+            redInput.disabled = false;
         }
     }
 };
