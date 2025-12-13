@@ -22,91 +22,119 @@ const SOUNDS = {
 
 class AudioManager {
     constructor() {
-        this.buffers = {};
-        this.context = null; // AudioContext создадим при первом клике (политика браузеров)
-        this.isReady = false;
+        // Создаем контекст (он будет suspended до первого клика)
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.buffers = {}; // Кэш загруженных звуков
+        this.isLoaded = false;
         
-        // Хранилище звуков моторов для каждого игрока: { 1: { move: Audio, idle: Audio } }
-        this.engineSounds = {}; 
+        // Активные источники звука (для остановки лупов)
+        // { playerId: { idle: SourceNode, move: SourceNode, currentType: 'idle'|'move' } }
+        this.activeEngines = {}; 
     }
 
-    // Инициализация по первому клику
-    init() {
-        if (this.isReady) return;
-        
-        // Простая реализация через HTML5 Audio для начала (проще, чем WebAudioAPI)
-        // Предзагрузка не критична для локалки
-        this.isReady = true;
+    // Загрузка всех звуков при старте
+    async loadAll() {
+        if (this.isLoaded) return;
+
+        const promises = Object.entries(SOUNDS).map(async ([key, url]) => {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                this.buffers[key] = audioBuffer;
+            } catch (e) {
+                console.error(`Failed to load sound: ${key}`, e);
+            }
+        });
+
+        await Promise.all(promises);
+        this.isLoaded = true;
+        console.log("Audio loaded");
+    }
+
+    // Метод для "разморозки" аудио контекста по клику
+    resume() {
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+        this.loadAll(); // Запускаем загрузку, если еще не начали
     }
 
     play(name) {
-        if (!this.isReady) return;
-        const src = SOUNDS[name];
-        if (!src) return;
-
-        const audio = new Audio(src);
-        audio.volume = 0.6; // Чуть тише, чтобы не оглохнуть
+        if (!this.isLoaded || !this.buffers[name]) return;
         
-        // Ошибка "play() failed because the user didn't interact" может быть, 
-        // поэтому всегда оборачиваем в catch
-        audio.play().catch(e => {}); 
+        // Создаем источник
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffers[name];
+        
+        // Подключаем к выходу (динамикам)
+        // Можно добавить GainNode для громкости
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.value = 0.4; // Громкость эффектов
+        
+        source.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        
+        source.start(0);
     }
 
-    // Управление мотором танка
     updateEngine(playerId, isMoving) {
-        if (!this.isReady) return;
-
-        // Если для этого игрока еще нет звуков - создаем
-        if (!this.engineSounds[playerId]) {
-            this.engineSounds[playerId] = {
-                idle: new Audio(SOUNDS.idle),
-                move: new Audio(SOUNDS.move),
-                current: null // Кто сейчас играет
-            };
-            
-            // Настройки
-            const s = this.engineSounds[playerId];
-            s.idle.loop = true;
-            s.move.loop = true;
-            s.idle.volume = 0.3;
-            s.move.volume = 0.3;
+        if (!this.isLoaded) return;
+        
+        // Инициализируем структуру для игрока
+        if (!this.activeEngines[playerId]) {
+            this.activeEngines[playerId] = { source: null, type: null };
         }
 
-        const s = this.engineSounds[playerId];
-        const target = isMoving ? s.move : s.idle;
-        const other = isMoving ? s.idle : s.move;
+        const engine = this.activeEngines[playerId];
+        const neededType = isMoving ? 'move' : 'idle';
 
-        // Если нужное уже играет - ничего не делаем
-        if (s.current === target) return;
+        // Если звук уже играет и он правильный - выходим
+        if (engine.source && engine.type === neededType) return;
 
-        // Переключаем
-        other.pause();
-        // other.currentTime = 0; // Можно сбрасывать, а можно нет (для плавности)
-        
-        target.play().catch(e => {});
-        s.current = target;
+        // Останавливаем старый звук
+        if (engine.source) {
+            try { engine.source.stop(); } catch(e){}
+            engine.source = null;
+        }
+
+        // Запускаем новый
+        if (this.buffers[neededType]) {
+            const source = this.ctx.createBufferSource();
+            source.buffer = this.buffers[neededType];
+            source.loop = true; // ИДЕАЛЬНЫЙ ЛУП
+            
+            const gainNode = this.ctx.createGain();
+            gainNode.gain.value = 0.2; // Мотор потише
+            
+            source.connect(gainNode);
+            gainNode.connect(this.ctx.destination);
+            
+            source.start(0);
+            
+            engine.source = source;
+            engine.type = neededType;
+        }
     }
 
     stopEngine(playerId) {
-        const s = this.engineSounds[playerId];
-        if (s) {
-            s.idle.pause();
-            s.move.pause();
-            s.current = null;
+        const engine = this.activeEngines[playerId];
+        if (engine && engine.source) {
+            try { engine.source.stop(); } catch(e){}
+            engine.source = null;
+            engine.type = null;
         }
-    }
-
-    stopAll() {
-        // Остановить все моторы (при Game Over)
-        Object.values(this.engineSounds).forEach(s => {
-            s.idle.pause();
-            s.move.pause();
-        });
     }
 }
 
 export const audio = new AudioManager();
 
-// Хак для автозапуска аудио контекста в Chrome
-window.addEventListener('keydown', () => audio.init(), { once: true });
-window.addEventListener('click', () => audio.init(), { once: true });
+// Хак для автозапуска
+const unlockAudio = () => {
+    audio.resume();
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('click', unlockAudio);
+};
+
+window.addEventListener('keydown', unlockAudio);
+window.addEventListener('click', unlockAudio);
