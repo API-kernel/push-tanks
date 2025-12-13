@@ -102,6 +102,12 @@ socket.on('lobby_update', (data) => {
     if (window.updateLobbyUI) window.updateLobbyUI(data);
 });
 
+let mapList = [];
+socket.on('maps_list', (list) => {
+    mapList = list;
+    if (window.updateMapSelector) window.updateMapSelector(list);
+});
+
 let currentRoomId = "";
 let amIHost = false;
 socket.on('return_to_lobby', () => {

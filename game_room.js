@@ -8,6 +8,7 @@ import { MAP_WIDTH, MAP_HEIGHT, TANK_STATS, TILE_SIZE } from './shared/config.js
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
+import fs from 'fs/promises';
 
 export class GameRoom {
     constructor(roomId, io) {
@@ -104,21 +105,28 @@ export class GameRoom {
         this.settings = { ...this.settings, ...newSettings };
     }
 
-    startGame() {
+    async startGame() {
         if (this.isRunning) return;
         
-        if (this.interval) clearInterval(this.interval);
+        // 1. Загрузка (ждем завершения)
+        const lvlName = this.settings.level; // "1"
+        await this.loadMap(lvlName); // Здесь this.map станет массивом
 
-        this.resetGame(); // Сброс карты и позиций
+        if (!this.map) {
+            console.error("Map not loaded!");
+            return;
+        }
+
+        // 2. Только теперь запускаем
+        this.resetGame(); 
         this.isRunning = true;
         
-        // Запускаем цикл
+        // Очищаем старый интервал на всякий случай
+        if (this.interval) clearInterval(this.interval);
+        
         this.interval = setInterval(() => this.update(), 1000 / 60);
         
-        // Сообщаем всем, что игра началась (переход из лобби в канвас)
         this.io.to(this.id).emit('game_start');
-        
-        // Отправляем начальную карту (важно!)
         this.io.to(this.id).emit('map_init', this.map);
     }
 
@@ -346,7 +354,7 @@ export class GameRoom {
     }
 
     resetGame() {
-        this.map = createLevel();
+        this.map = createLevel(this.rawMapData);
         this.bullets = [];
         this.enemies = [];
         this.pendingSpawns = [];
@@ -387,6 +395,22 @@ export class GameRoom {
     destroy() {
         if (this.interval) {
             clearInterval(this.interval);
+        }
+    }
+
+    async loadMap(levelName) {
+        try {
+            // Читаем JSON файл
+            const filePath = `./shared/maps/${levelName}.json`;
+            const data = await fs.readFile(filePath, 'utf-8');
+            this.rawMapData = JSON.parse(data);
+            
+            this.map = createLevel(this.rawMapData);
+            console.log(`Map ${levelName} loaded`);
+        } catch (e) {
+            console.error(`Failed to load map ${levelName}`, e);
+            this.rawMapData = Array(26).fill().map(() => Array(26).fill(0));
+            this.map = createLevel(this.rawMapData);
         }
     }
 }

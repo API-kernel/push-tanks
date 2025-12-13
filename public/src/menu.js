@@ -13,7 +13,7 @@ window.changeTeam = (localIndex, teamId) => {
 
 window.changeSettings = () => {
     if (!isMyHost) return;
-    const level = parseInt(document.getElementById('opt-level').value);
+    const level = document.getElementById('opt-level-select').value;
     const lives = parseInt(document.getElementById('opt-lives').value);
     const maxActive = parseInt(document.getElementById('opt-max-active').value);
     
@@ -30,6 +30,21 @@ window.changeSettings = () => {
             allowHotJoin: hotjoin 
         });
     }
+};
+
+window.updateMapSelector = (list) => {
+    const select = document.getElementById('opt-level-select'); // Создадим его в HTML
+    if (!select) return;
+    
+    const currentVal = select.value;
+    
+    select.innerHTML = '';
+    list.forEach(mapName => {
+        const opt = document.createElement('option');
+        opt.value = mapName;
+        opt.innerText = mapName.toUpperCase(); // Красиво
+        select.appendChild(opt);
+    });
 };
 
 window.changeName = (localIndex, val) => {
@@ -53,6 +68,14 @@ window.updateLobbyUI = (data) => {
 
     // 2. Обновляем Настройки
     if (data.settings) {
+
+        const lvlSelect = document.getElementById('opt-level-select');
+        if (lvlSelect) {
+            lvlSelect.value = data.settings.level;
+            if (!isMyHost) lvlSelect.disabled = true;
+            else lvlSelect.disabled = false;
+        }
+
         const lvlInput = document.getElementById('opt-level');
 
         // Если я НЕ хост, я обновляю свои инпуты значениями с сервера
@@ -245,7 +268,7 @@ window.updateLobbyUI = (data) => {
     updateLobbyList(data.players);
 
     if (data.settings) {
-        const lvlInput = document.getElementById('opt-level');
+        const lvlInput = document.getElementById('opt-level-select');
         const hotjoinInput = document.getElementById('opt-hotjoin'); // Новая галочка
         const greenInput = document.getElementById('opt-bots-green');
         const redInput = document.getElementById('opt-bots-red');

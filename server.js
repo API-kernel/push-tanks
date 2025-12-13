@@ -3,7 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GameRoom } from './game_room.js'; // Используем src/game_room.js
+import { GameRoom } from './game_room.js';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,24 @@ app.use('/shared', express.static(path.join(__dirname, 'shared')));
 // Хранилище комнат { "ABCD": GameRoom }
 const rooms = {};
 
+const mapsDir = path.join(__dirname, 'shared', 'maps');
+let availableMaps = [];
+
+if (fs.existsSync(mapsDir)) {
+    const files = fs.readdirSync(mapsDir);
+    availableMaps = files
+        .filter(f => f.endsWith('.json')) // Ищем .json
+        .map(f => path.basename(f, '.json'))
+        .sort((a, b) => {
+            // Сортировка: числа, потом строки
+            const nA = parseInt(a);
+            const nB = parseInt(b);
+            if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+            return a.localeCompare(b);
+        });
+    console.log("Maps found:", availableMaps);
+}
+
 function generateRoomId() {
     let result = '';
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Без I, O, 0, 1 для читаемости
@@ -30,6 +49,8 @@ function generateRoomId() {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     
+    socket.emit('maps_list', availableMaps);
+
     // Переменная, хранящая ID комнаты для ЭТОГО сокета
     let currentRoomId = null;
 

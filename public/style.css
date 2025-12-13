@@ -279,3 +279,29 @@ input {
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
 }
+
+/* Добавь это */
+.lobby-settings select {
+    width: 120px;
+    padding: 5px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 16px;
+    border: 2px solid white;
+    background: black;
+    color: white;
+    cursor: pointer;
+    /* Убираем стандартную стрелку браузера (для красоты) */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    text-align: center;
+}
+
+.lobby-settings select:hover {
+    background: #222;
+}
+
+.lobby-settings select:focus {
+    outline: none;
+    border-color: #63db44;
+}
