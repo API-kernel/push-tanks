@@ -7,6 +7,7 @@ import { checkRectOverlap } from './shared/utils.js';
 import { MAP_WIDTH, MAP_HEIGHT, TANK_STATS, TILE_SIZE } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION } from './shared/config.js';
+import { BattleSystem } from './battle_system.js';
 
 export class GameRoom {
     constructor(roomId, io) {
@@ -28,6 +29,7 @@ export class GameRoom {
         
         this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
         
+        this.isPaused = false;
         this.isGameOver = false;
         this.gameOverTimer = 0;
         this.botsSpawnedCount = { 1: 0, 2: 0 };
@@ -44,9 +46,11 @@ export class GameRoom {
             maxActiveEnemies: 4,
             botsReserve: { 1: 20, 2: 20 } 
         };
+
+        this.battleSystem = new BattleSystem(this);
     }
 
-    addPlayer(socketId, localIndex) {
+    addPlayer(socketId, localIndex, nickname) {
         const uniqueId = `${socketId}_${localIndex}`;
         
         let pIndex = 0;
@@ -62,6 +66,7 @@ export class GameRoom {
         
         this.players[uniqueId] = {
             id: uniqueId,
+            nickname: nickname,
             socketId, localIndex, playerIndex: pIndex,
             team: teamId,
             x: sp.x, y: sp.y,
@@ -121,6 +126,11 @@ export class GameRoom {
         this.io.to(this.id).emit('game_end');
     }
 
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        this.broadcastState();
+    }
+
     handleInput(socketId, data) {
         for (const localIndex in data) {
             const id = `${socketId}_${localIndex}`;
@@ -140,6 +150,11 @@ export class GameRoom {
     }
 
     update() {
+        if (this.isPaused) {
+            this.broadcastState();
+            return;
+        }
+
         if (this.isGameOver) {
             this.gameOverTimer++;
             if (this.gameOverTimer > 300) {
@@ -174,18 +189,14 @@ export class GameRoom {
         Object.values(this.players).forEach(p => { if(!p.isDead) playerCounts[p.team]++; });
         
         if (this.effectTimers.clock > 0) this.effectTimers.clock--;
-        const clockActiveTeam = (this.effectTimers.clock > 0) ? this.effectTimers.clockTeam : null;
-        updateEnemies(this, MAP_WIDTH, MAP_HEIGHT, this.checkGlobalCollision.bind(this), playerCounts, clockActiveTeam);
+        updateEnemies(this);
 
         // 3. ПУЛИ
         const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT);
         this.bulletEvents.push(...bEvents);
 
         // 4. КОЛЛИЗИИ
-        this.checkCollisions();
-
-        // 5. ОТПРАВКА
-        this.broadcastState();
+        this.battleSystem.update();
 
         // --- МИГАНИЕ СТЕН (Лопата заканчивается) ---
         if (this.effectTimers.shovel > 0) {
@@ -204,6 +215,9 @@ export class GameRoom {
                 this.teamManager.fortifyBase(this.effectTimers.shovelTeam, false, this.map);
             }
         }
+
+        // 5. ОТПРАВКА
+        this.broadcastState();
     }
 
     updatePlayer(p) {
@@ -264,77 +278,6 @@ export class GameRoom {
                 p.bulletCooldown = (p.level >= 2) ? 15 : 25; 
             }
         }
-    }
-
-    checkCollisions() {
-        const targets = [...this.enemies, ...Object.values(this.players).filter(p => !p.isDead && !p.isSpawning)];
-
-        this.bullets.forEach(b => {
-            if (b.isDead) return;
-
-            for (const otherB of this.bullets) {
-                if (b !== otherB && !otherB.isDead && b.team !== otherB.team) {
-                    if (checkRectOverlap(b, otherB)) {
-                        b.isDead = true; otherB.isDead = true;
-                        this.bulletEvents.push({ type: 'BULLET_CLASH', x: b.x, y: b.y });
-                    }
-                }
-            }
-            if (b.isDead) return;
-
-            const bases = this.teamManager.getAllBases();
-            bases.forEach(base => {
-                if (base.isDead) return;
-                if (checkRectOverlap(b, base)) {
-                    b.isDead = true;
-                    this.teamManager.destroyBase(base.team);
-                    this.bulletEvents.push({ type: 'BASE_DESTROY', x: base.x, y: base.y });
-                    this.isGameOver = true;
-                }
-            });
-
-            for (const tank of targets) {
-                if (b.team !== tank.team) {
-                    if (checkRectOverlap(b, tank)) {
-                        b.isDead = true;
-                        
-                        if (tank.shieldTimer > 0) {
-                            this.bulletEvents.push({ type: 'SHIELD_HIT', x: tank.x, y: tank.y });
-                            break; 
-                        }
-
-                        let isDead = false;
-                        if (tank.inputs) { 
-                            isDead = true; 
-                        } else { 
-                            const idx = this.enemies.indexOf(tank);
-                            if (idx !== -1) {
-                                const wasBonus = tank.isBonus;
-                                isDead = hitEnemy(this, idx);
-                                
-                                // Если был бонусный и перестал им быть (значит выбили)
-                                if (wasBonus && !tank.isBonus) {
-                                    this.bulletEvents.push({ type: 'BONUS_SPAWN' });
-                                }
-                            }
-                        }
-
-                        if (isDead) {
-                            this.bulletEvents.push({ type: 'TANK_EXPLODE', x: tank.x, y: tank.y, isPlayer: !!tank.inputs });
-                            if (tank.inputs) {
-                                tank.isDead = true;
-                                tank.lives--;
-                                tank.respawnTimer = 90;
-                                tank.x = -1000;
-                            }
-                        } else {
-                            this.bulletEvents.push({ type: 'ARMOR_HIT', x: tank.x, y: tank.y });
-                        }
-                        break;
-                    }
-                }
-            }
-        });
     }
 
     applyBonus(player, type) {
@@ -432,6 +375,7 @@ export class GameRoom {
             events: this.bulletEvents,
             map: this.map,
             bases: this.teamManager.getAllBases(),
+            isPaused: this.isPaused,
             isGameOver: this.isGameOver,
             bonus: this.activeBonus,
             settings: this.settings

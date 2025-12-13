@@ -1,4 +1,4 @@
-import { SPAWN_DELAY, TANK_STATS  } from './config.js';
+import { SPAWN_DELAY, TANK_STATS, MAP_WIDTH, MAP_HEIGHT } from './config.js';
 import { createBullet } from './bullet.js';
 import { destroyBlockAt } from './level.js';
 import { updateTankMovement } from './tank.js';
@@ -6,9 +6,10 @@ import { spawnBonus } from './bonus.js';
 
 
 const ENEMY_TYPES = [
-    { type: 'basic', spriteKey: 'enemy_basic', ...TANK_STATS.basic, bulletLvl: 1 },
-    { type: 'fast',  spriteKey: 'enemy_fast',  ...TANK_STATS.fast,  bulletLvl: 1 },
-    { type: 'armor', spriteKey: 'enemy_armor', ...TANK_STATS.armor, bulletLvl: 2 }
+    { type: 'basic', spriteKey: 'basic', ...TANK_STATS.basic, bulletLvl: 1 },
+    { type: 'fast',  spriteKey: 'fast',  ...TANK_STATS.fast,  bulletLvl: 1 },
+    { type: 'heavy', spriteKey: 'heavy', ...TANK_STATS.heavy, bulletLvl: 2 },
+    { type: 'armor', spriteKey: 'armor', ...TANK_STATS.armor, bulletLvl: 2 }
 ];
 
 export function hitEnemy(room, index) {
@@ -29,34 +30,46 @@ export function hitEnemy(room, index) {
 }
 
 // ГЛАВНАЯ ФУНКЦИЯ
-// room - это объект GameRoom (содержит enemies, pendingSpawns, map, teamManager и т.д.)
-export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, playerCounts, clockActiveTeam) {
+export function updateEnemies(room) {
+    const { map, teamManager, teamSpawnTimers, enemies, pendingSpawns, settings } = room;
+    // Достаем активных игроков для лимитов
+    const playerCounts = {};
+    teamManager.getTeams().forEach(t => playerCounts[t.id] = 0);
+    Object.values(room.players).forEach(p => { if(!p.isDead) playerCounts[p.team]++; });
+
+    // Проверка часов
+    const clockActiveTeam = (room.effectTimers.clock > 0) ? room.effectTimers.clockTeam : null;
+
     // 1. СПАВН
-    const teams = room.teamManager.getTeams();
+    const teams = teamManager.getTeams();
     teams.forEach(team => {
-        // Инициализируем таймер в комнате, если нет
-        if (room.teamSpawnTimers[team.id] === undefined) room.teamSpawnTimers[team.id] = 0;
+        if (teamSpawnTimers[team.id] === undefined) teamSpawnTimers[team.id] = 0;
 
-        // ЛИМИТ РЕЗЕРВА
+        // Считаем кол-во ботов этой команды
         const spawned = room.botsSpawnedCount[team.id] || 0;
-        const total = room.settings.botsReserve[team.id] || 0;
+        const totalReserve = settings.botsReserve[team.id] || 0;
+        
+        // Если резерв исчерпан - не спавним
+        if (spawned >= totalReserve) return;
 
-        if (spawned >= total) return;
-
+        // Лимит активных
         const activeCount = (playerCounts[team.id] || 0) + 
-                            room.enemies.filter(e => e.team === team.id).length + 
-                            room.pendingSpawns.filter(s => s.team === team.id).length;
+                            enemies.filter(e => e.team === team.id).length + 
+                            pendingSpawns.filter(s => s.team === team.id).length;
 
-        if (activeCount < room.settings.maxActiveEnemies) {
-            room.teamSpawnTimers[team.id]++;
-            if (room.teamSpawnTimers[team.id] > SPAWN_DELAY) {
-                const busyEntities = [...Object.values(room.players), ...room.enemies, ...room.pendingSpawns];
+        // Лимит активных берем из настроек комнаты
+        if (activeCount < settings.maxActiveEnemies) {
+            teamSpawnTimers[team.id]++;
+            if (teamSpawnTimers[team.id] > SPAWN_DELAY) {
+                // Собираем busyEntities для умного спавна
+                const busyEntities = [...Object.values(room.players), ...enemies, ...pendingSpawns];
+                const point = teamManager.getSpawnPoint(team.id, busyEntities);
                 
-                const point = room.teamManager.getSpawnPoint(team.id, busyEntities);
                 if (point) {
                     createSpawnAnimation(room, team.id, point.x, point.y);
-                    room.teamSpawnTimers[team.id] = 0;
-
+                    teamSpawnTimers[team.id] = 0;
+                    
+                    // Увеличиваем счетчик заспавненных
                     if (!room.botsSpawnedCount[team.id]) room.botsSpawnedCount[team.id] = 0;
                     room.botsSpawnedCount[team.id]++;
                 }
@@ -80,8 +93,10 @@ export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, pla
     }
 
     // 3. БОТЫ
-    for (let i = room.enemies.length - 1; i >= 0; i--) {
-        const enemy = room.enemies[i];
+    const collisionFunc = room.checkGlobalCollision.bind(room);
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
 
         if (clockActiveTeam && enemy.team !== clockActiveTeam) continue;
 
@@ -89,7 +104,7 @@ export function updateEnemies(room, gameWidth, gameHeight, onCheckCollision, pla
             changeDirection(enemy);
         }
 
-        const moved = updateTankMovement(enemy, enemy.direction, gameWidth, gameHeight, room.map, onCheckCollision);
+        const moved = updateTankMovement(enemy, enemy.direction, MAP_WIDTH, MAP_HEIGHT, map, collisionFunc);
         
         if (!moved) {
             if (Math.random() < 0.5) changeDirection(enemy);
@@ -116,14 +131,16 @@ function spawnTankFromStar(room, star) {
 
     const rand = Math.random();
     let template = ENEMY_TYPES[0];
-    if (rand > 0.6) template = ENEMY_TYPES[1];
-    if (rand > 0.9) template = ENEMY_TYPES[2];
+    if (rand < 0.4) template = ENEMY_TYPES[0];      // Basic
+    else if (rand < 0.6) template = ENEMY_TYPES[1]; // Fast
+    else if (rand < 0.8) template = ENEMY_TYPES[2]; // Heavy
+    else template = ENEMY_TYPES[3];                 // Armor
 
     const teamConfig = room.teamManager.getTeam(star.team);
     const startDir = teamConfig ? teamConfig.direction : 'DOWN';
 
     // Шанс бонуса
-    const isBonus = Math.random() < 0.2;
+    const isBonus = Math.random() < 0.3;
 
     room.enemies.push({
         id: room.enemyIdCounter++,

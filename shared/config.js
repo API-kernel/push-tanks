@@ -39,19 +39,20 @@ export const TEAMS_CONFIG = [
 
 export const TANK_STATS = {
     player: { speed: 1.0, hp: 1, bulletSpeed: 3, bulletSpeedFast: 5 },
-    basic:  { speed: 0.5, hp: 1, bulletSpeed: 3 },
+    basic:  { speed: 0.6, hp: 1, bulletSpeed: 3 },
     fast:   { speed: 1.2, hp: 1, bulletSpeed: 3 },
-    armor:  { speed: 0.4, hp: 4, bulletSpeed: 5 }
+    heavy:  { speed: 0.6, hp: 1, bulletSpeed: 5 },
+    armor:  { speed: 0.5, hp: 4, bulletSpeed: 5 }
 };
 
 export const BONUS_WEIGHTS = {
-    'star': 20,
+    'star': 25,
     'grenade': 10,
-    'clock': 20,
-    'helmet': 14,
-    'tank': 10,
-    'gun': 1,
-    'shovel': 25
+    'clock': 15,
+    'helmet': 15,
+    'tank': 15,
+    'gun': 5,
+    'shovel': 15
 };
 
 export const HELMET_DURATION = 300; 

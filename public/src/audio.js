@@ -1,6 +1,6 @@
 // Список файлов
 const SOUNDS = {
-    base_crash: './assets/base_craash.mp3',
+    base_crash: './assets/explosion_player.mp3',
     fire:       './assets/fire.mp3',
     ice_skid:       './assets/ice_skid.mp3',
     game_over:  './assets/game_over.mp3',

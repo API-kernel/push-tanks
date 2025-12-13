@@ -33,6 +33,19 @@ window.changeSettings = () => {
     }
 };
 
+window.changeName = (localIndex, val) => {
+    if (window.tankGame) window.tankGame.changeName(localIndex, val);
+};
+
+window.selectLocalPlayers = (n) => {
+    localPlayersCount = n;
+    document.getElementById('btn-1p').classList.toggle('selected', n === 1);
+    document.getElementById('btn-2p').classList.toggle('selected', n === 2);
+    
+    // Показываем второе поле
+    document.getElementById('nick-p2').style.display = (n === 2) ? 'inline-block' : 'none';
+};
+
 window.updateLobbyUI = (data) => {
     // data = { players, settings }
     
@@ -57,48 +70,96 @@ window.updateLobbyUI = (data) => {
 };
 
 window.updateLobbyList = (players) => {
+    // 1. Запоминаем фокус
+    const activeEl = document.activeElement;
+    const activeId = activeEl ? activeEl.id : null;
+    // Если мы печатаем в инпуте, запомним позицию курсора
+    const selectionStart = activeEl ? activeEl.selectionStart : 0;
+    const selectionEnd = activeEl ? activeEl.selectionEnd : 0;
+
     const container = document.getElementById('lobby-players');
     container.innerHTML = '';
 
-    // Считаем моих игроков
-    let myCount = 0;
-    Object.values(players).forEach(p => {
-        if (p.socketId === mySocketId) myCount++;
+    // Сортировка
+    const sortedPlayers = Object.values(players).sort((a, b) => {
+        if (a.socketId === mySocketId && b.socketId !== mySocketId) return -1;
+        if (a.socketId !== mySocketId && b.socketId === mySocketId) return 1;
+        return a.localIndex - b.localIndex;
     });
 
-    Object.values(players).forEach(p => {
+    let myCount = 0;
+
+    sortedPlayers.forEach(p => {
+        if (p.socketId === mySocketId) myCount++;
+
         const div = document.createElement('div');
         div.className = 'lobby-player-row';
-        div.style.color = (p.team === 1) ? '#63db44' : '#d43333';
         
         const isMe = p.socketId === mySocketId;
-        const name = isMe ? `YOU (P${p.localIndex + 1})` : `PLAYER ${p.playerIndex + 1}`;
         
-        let html = `<span>${name}</span>`;
+        // Генерируем уникальный ID для инпута, чтобы восстановить фокус
+        const inputId = `nick-input-${p.socketId}-${p.localIndex}`;
+        
+        let nameHtml = '';
+        if (isMe) {
+            let val = p.nickname || "";
+            if (activeId === inputId && activeEl) {
+                val = activeEl.value; // Оставляем локальное значение
+            }
+
+            nameHtml = `<input type="text" id="${inputId}" class="lobby-name-input" 
+                value="${val}" 
+                onchange="changeName(${p.localIndex}, this.value)" 
+                maxlength="10">`;
+        } else {
+            nameHtml = `<span class="lobby-name-text" style="color:${p.team === 1 ? '#63db44' : '#d43333'}">${p.nickname || 'Unknown'}</span>`;
+        }
+
+        // 2. КОЛОНКА КНОПОК
+        let actionsHtml = '';
         
         if (isMe) {
-            // Выбор команды
-            html += `
-                <button onclick="changeTeam(${p.localIndex}, 1)" ${p.team===1?'disabled':''}>GREEN</button>
-                <button onclick="changeTeam(${p.localIndex}, 2)" ${p.team===2?'disabled':''}>RED</button>
-            `;
-            // Кнопка удаления (только для P2)
+            // Кнопки команд с подсветкой
+            const greenClass = p.team === 1 ? 'team-btn team-btn-green active' : 'team-btn team-btn-green';
+            const redClass =   p.team === 2 ? 'team-btn team-btn-red active'   : 'team-btn team-btn-red';
+            
+            actionsHtml += `<button class="${greenClass}" onclick="changeTeam(${p.localIndex}, 1)">GREEN</button>`;
+            actionsHtml += `<button class="${redClass}" onclick="changeTeam(${p.localIndex}, 2)">RED</button>`;
+            
+            // Кнопка удаления
             if (p.localIndex > 0) {
-                html += `<button onclick="removeLocalPlayer(${p.localIndex})" style="color:red;">X</button>`;
+                actionsHtml += `<button class="btn-remove" onclick="removeLocalPlayer(${p.localIndex})">×</button>`;
+            } else {
+                actionsHtml += `<div class="btn-placeholder"></div>`; // Пустое место для выравнивания
             }
         } else {
-            html += `<span>${p.team === 1 ? 'GREEN' : 'RED'}</span>`;
+            // Для чужих просто пишем команду
+            const color = p.team === 1 ? '#63db44' : '#d43333';
+            const label = p.team === 1 ? 'GREEN' : 'RED';
+            actionsHtml = `<span class="team-label" style="color: ${color}; font-weight: bold;">${label}</span>`;
         }
         
-        div.innerHTML = html;
+        div.innerHTML = nameHtml + actionsHtml;
         container.appendChild(div);
     });
 
-    // Кнопка добавления (если у меня < 2 игроков)
+    // Кнопка добавления
     if (myCount < 2) {
-        const addBtn = document.createElement('div');
-        addBtn.innerHTML = `<button onclick="addLocalPlayer()">+ ADD PLAYER 2</button>`;
-        container.appendChild(addBtn);
+        const addDiv = document.createElement('div');
+        addDiv.className = 'lobby-add-row';
+        addDiv.innerHTML = `<button onclick="addLocalPlayer()">+ ADD LOCAL PLAYER</button>`;
+        container.appendChild(addDiv);
+    }
+
+    if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) {
+            el.focus();
+            // Восстанавливаем курсор
+            if (el.setSelectionRange) {
+                el.setSelectionRange(selectionStart, selectionEnd);
+            }
+        }
     }
 };
 

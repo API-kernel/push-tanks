@@ -14,13 +14,26 @@ body {
 }
 
 canvas {
-    /* Размеры задаются в JS/предыдущем CSS, тут можно оставить display: block */
     display: block;
+}
+
+/* Добавь ID селектор для фона */
+#gameCanvas {
+    background-color: #636363; /* Фон игры */
     image-rendering: pixelated;
-    background-color: #636363;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    width: 912px; 
-    height: 816px; 
+}
+
+#uiCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    /* Фон прозрачный по умолчанию */
+}
+
+#gameCanvas, #uiCanvas {
+    width: 864px; /* 288 * 3 */
+    height: 816px; /* 272 * 3 */
 }
 
 /* Оверлей меню */
@@ -142,27 +155,109 @@ input {
     color: #888;
 }
 
-/* Рамка для списка игроков */
+
+/* Список игроков */
 #lobby-players {
-    width: 440px; /* settings width + padding */
+    width: 500px;
     margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .lobby-player-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    /* Сетка: Имя (растягивается) | Кнопка | Кнопка | Крестик */
+    grid-template-columns: 1fr 80px 80px 40px; 
+    gap: 10px;
     align-items: center;
-    padding: 10px;
-    border-bottom: 2px dashed #444;
-    font-size: 12px; /* Чуть меньше шрифт, чтобы влезло имя */
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #333;
 }
 
-/* Кнопки удаления/смены команды внутри строки */
-.lobby-player-row button {
-    padding: 5px 10px;
+/* Инпут имени внутри строки */
+.lobby-name-input {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #555;
+    color: white;
+    font-family: 'Press Start 2P', cursive;
+}
+.lobby-name-input:focus {
+    outline: none;
+    border-color: #fff;
+}
+
+/* Текст имени (чужой) */
+.lobby-name-text {
+    font-size: 12px;
+    padding-left: 5px;
+}
+
+/* Кнопки команд */
+.team-btn {
+    padding: 8px 0;
     font-size: 10px;
-    margin: 0 2px;
-    border-width: 2px;
+    margin: 0;
+    cursor: pointer;
+    border: 2px solid #555;
+    background: transparent;
+    color: #555;
+    transition: all 0.2s;
+}
+
+/* Активная Зеленая */
+.team-btn-green.active {
+    border-color: #63db44;
+    background-color: #63db44;
+    color: black;
+    box-shadow: 0 0 8px #63db44;
+}
+
+/* Активная Красная */
+.team-btn-red.active {
+    border-color: #d43333;
+    background-color: #d43333;
+    color: white;
+    box-shadow: 0 0 8px #d43333;
+}
+
+/* Кнопка удаления (крестик) */
+.btn-remove {
+    padding: 5px;
+    font-size: 14px;
+    color: #d43333;
+    border: none;
+    background: transparent;
+}
+.btn-remove:hover {
+    color: red;
+    background: transparent;
+    transform: scale(1.2);
+}
+
+.btn-placeholder {
+    width: 40px; /* Чтобы P1 занимал столько же места, сколько P2 */
+}
+
+/* Кнопка добавления */
+.lobby-add-row {
+    text-align: left;
+    padding-left: 10px;
+}
+.lobby-add-row button {
+    font-size: 10px;
+    padding: 10px;
+    border: 1px dashed #666;
+    color: #888;
+}
+.lobby-add-row button:hover {
+    border-color: white;
+    color: white;
 }
 
 /* Кнопка Старт - делаем её большой и заметной */

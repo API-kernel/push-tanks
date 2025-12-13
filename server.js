@@ -39,10 +39,11 @@ io.on('connection', (socket) => {
     socket.on('create_room', (config) => {
         const roomId = generateRoomId();
         const room = new GameRoom(roomId, io);
+        room.hostSocketId = socket.id;
         rooms[roomId] = room;
         
         // Вход в комнату (общая логика)
-        joinRoomLogic(socket, roomId, config.localCount || 1, true); // true = isHost
+        joinRoomLogic(socket, roomId, config.localCount || 1, true, config.nicknames); // true = isHost
     });
 
     // 2. Войти в комнату
@@ -59,7 +60,7 @@ io.on('connection', (socket) => {
             console.log("Room not found, creating:", roomId);
             room = new GameRoom(roomId, io);
             rooms[roomId] = room;
-            joinRoomLogic(socket, roomId, data.localCount || 1, true);
+            joinRoomLogic(socket, roomId, data.localCount || 1, true, data.nicknames);
             return;
         }
         
@@ -69,7 +70,7 @@ io.on('connection', (socket) => {
             return;
         }
         
-        joinRoomLogic(socket, roomId, data.localCount || 1, false);
+        joinRoomLogic(socket, roomId, data.localCount || 1, false, data.nicknames);
     });
 
     // 3. Quick Play (Матчмейкинг)
@@ -102,14 +103,15 @@ io.on('connection', (socket) => {
     });
 
     // Хелпер входа (чтобы не дублировать)
-    function joinRoomLogic(socket, roomId, localCount, isHost) {
+    function joinRoomLogic(socket, roomId, localCount, isHost, nicknames = []) {
         currentRoomId = roomId;
         const room = rooms[roomId];
         socket.join(roomId);
 
         // Добавляем игроков
         for(let i=0; i<localCount; i++) {
-            room.addPlayer(socket.id, i);
+            const name = nicknames[i] || `P${i+1}`;
+            room.addPlayer(socket.id, i, name);
         }
 
         socket.emit('room_joined', { roomId, isHost });
@@ -127,6 +129,7 @@ io.on('connection', (socket) => {
     function createRoomLogic(socket, localCount, autoStart = false) {
         const roomId = generateRoomId();
         const room = new GameRoom(roomId, io);
+        room.hostSocketId = socket.id;
         rooms[roomId] = room;
         
         joinRoomLogic(socket, roomId, localCount, true); // true = isHost
@@ -154,6 +157,21 @@ io.on('connection', (socket) => {
             // Давай не будем двигать, пусть при старте расставит.
             
             io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+        }
+    });
+
+    socket.on('change_nickname', (data) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const room = rooms[currentRoomId];
+        const uniqueId = `${socket.id}_${data.localIndex}`;
+        
+        if (room.players[uniqueId]) {
+            // Обрезаем, чтобы не ломать верстку
+            room.players[uniqueId].nickname = (data.name || "").substring(0, 10).toUpperCase();
+            io.to(currentRoomId).emit('lobby_update', { 
+                players: room.players, 
+                settings: room.settings 
+            });
         }
     });
 
@@ -191,6 +209,16 @@ io.on('connection', (socket) => {
         if (localIndex > 0) {
             room.removeLocalPlayer(socket.id, localIndex);
             io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+        }
+    });
+
+    socket.on('toggle_pause', () => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const room = rooms[currentRoomId];
+        
+        // Проверка Хоста
+        if (room.hostSocketId === socket.id) {
+            room.togglePause();
         }
     });
 

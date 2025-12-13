@@ -1,19 +1,46 @@
 export const TILE_SIZE = 16;
 
-export const SPRITES = {
-    player_lvl1: [[0*16, 0*16, 16,16], [1*16, 0*16, 16,16]],
-    player_lvl2: [[0*16, 1*16, 16,16], [1*16, 1*16, 16,16]],
-    player_lvl3: [[0*16, 2*16, 16,16], [1*16, 2*16, 16,16]],
-    player_lvl4: [[0*16, 3*16, 16,16], [1*16, 3*16, 16,16]],
-    
-    enemy_basic: [[8*16, 0*16, 16,16], [9*16, 0*16, 16,16]],
-    enemy_fast:  [[8*16, 1*16, 16,16], [9*16, 1*16, 16,16]],
-    enemy_armor: [[8*16, 2*16, 16,16], [9*16, 2*16, 16,16]],
-    enemy_heavy: [[8*16, 3*16, 16,16], [9*16, 3*16, 16,16]],
+function getTankFrames(row, colStart) {
+    return [
+        [colStart * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE],
+        [(colStart + 1) * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE]
+    ];
+}
 
-    enemy_basic_red: [[8*16, 8*16, 16,16], [9*16, 8*16, 16,16]],
-    enemy_fast_red:  [[8*16, 9*16, 16,16], [9*16, 9*16, 16,16]],
-    enemy_armor_red: [[8*16, 10*16, 16,16], [9*16, 10*16, 16,16]],
+export const SPRITES = {
+    player_green_lvl1: getTankFrames(8, 0),
+    player_green_lvl2: getTankFrames(9, 0),
+    player_green_lvl3: getTankFrames(10, 0),
+    player_green_lvl4: getTankFrames(11, 0),
+
+    player_yellow_lvl1: getTankFrames(0, 0),
+    player_yellow_lvl2: getTankFrames(1, 0),
+    player_yellow_lvl3: getTankFrames(2, 0),
+    player_yellow_lvl4: getTankFrames(3, 0),
+    // --- БОТЫ (Обычные) ---
+
+    // ЖЕЛТЫЕ БОТЫ (Team 1) - Ряды 4-7
+    // Basic (Row 4), Fast (Row 5), Armor (Row 6)
+    bot_yellow_basic: getTankFrames(4, 0),
+    bot_yellow_fast:  getTankFrames(5, 0),
+    bot_yellow_armor: getTankFrames(6, 0),
+
+    // ЗЕЛЕНЫЕ БОТЫ (Team 2) - Ряды 12-15
+    bot_green_basic: getTankFrames(12, 0),
+    bot_green_fast:  getTankFrames(13, 0),
+    bot_green_armor: getTankFrames(14, 0),
+
+    // --- БОТЫ (Бонусные / Красные) ---
+    // Они находятся справа (X+128, col 8)
+    // Для Желтых (Rows 4-7, Cols 8-9)
+    bot_yellow_basic_red: getTankFrames(12, 8),
+    bot_yellow_fast_red:  getTankFrames(13, 8),
+    bot_yellow_armor_red: getTankFrames(14, 8),
+
+    // Для Зеленых (Rows 12-15, Cols 8-9)
+    bot_green_basic_red: getTankFrames(12, 8),
+    bot_green_fast_red:  getTankFrames(13, 8),
+    bot_green_armor_red: getTankFrames(14, 8),
 
     bullet: {
         UP:    [323, 102, 3, 4],

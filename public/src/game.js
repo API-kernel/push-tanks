@@ -4,14 +4,21 @@ import { InputHandler } from './input.js';
 import { drawHUD } from './ui.js';
 import { audio } from './audio.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING } from '../shared/config.js'; 
-import { drawMapLayers, drawForest, drawBullets, drawEnemies, drawPlayers, drawExplosions, drawBases, drawBonus, updateExplosions, createExplosion, EXPLOSION_SMALL, EXPLOSION_BIG } from './renderer.js';
+import { drawMapLayers, drawForest, drawBullets, drawPlayerNames,
+     drawEnemies, drawPlayers, drawExplosions, 
+     drawBases, drawBonus, updateExplosions, createExplosion,
+    EXPLOSION_SMALL, EXPLOSION_BIG } from './renderer.js';
 
 const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
+
+const uiCanvas = document.getElementById('uiCanvas');
+const uiCtx = uiCanvas.getContext('2d');
+uiCanvas.width = CANVAS_WIDTH * 3;
+uiCanvas.height = CANVAS_HEIGHT * 3;
 
 const game = {
     sprites: new Image(),
@@ -45,6 +52,9 @@ window.tankGame = {
     quickPlay: (localCount) => {
         socket.emit('quick_play', { localCount });
     },
+    changeName: (localIndex, name) => {
+        socket.emit('change_nickname', { localIndex, name });
+    },
     addLocalPlayer: () => socket.emit('add_local_player'),
     removeLocalPlayer: (idx) => socket.emit('remove_local_player', idx),
     updateSettings: (settings) => socket.emit('update_settings', settings)
@@ -64,8 +74,17 @@ socket.on('lobby_update', (data) => {
     if (window.updateLobbyList) window.updateLobbyList(data.players);
 });
 
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyP') {
+        socket.emit('toggle_pause');
+    }
+});
+
+let gameStartTime = 0;
 socket.on('game_start', () => {
     console.log("Game Started!");
+    gameStartTime = Date.now();
     if (window.hideMenu) window.hideMenu();
     // Фокус на игру (чтобы клавиши работали)
     window.focus();
@@ -117,6 +136,7 @@ socket.on('state', (state) => {
     serverState.enemies = state.enemies;
     serverState.bullets = state.bullets;
     serverState.bases = state.bases;
+    serverState.isPaused = state.isPaused;
     serverState.isGameOver = state.isGameOver;
     serverState.pendingSpawns = state.pendingSpawns;
 
@@ -240,6 +260,7 @@ function update() {
         up: game.input.keys['KeyW'],
         down: game.input.keys['KeyS'],
         left: game.input.keys['KeyA'],
+        pause: game.input.keys['KeyP'],
         right: game.input.keys['KeyD'],
         fire: game.input.keys['Space'],
         cheat0: game.input.keys['Digit0']
@@ -263,11 +284,23 @@ function draw() {
     // 1. Фон
     ctx.fillStyle = '#636363';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
     if (!game.isLoaded || !serverState.map) {
         ctx.fillStyle = 'white';
         ctx.fillText("Connecting...", 100, 100);
         return;
+    }
+
+    console.log(serverState.isPaused);
+    if (serverState.isPaused) {
+        uiCtx.save();
+        uiCtx.font = 'bold 40px "Press Start 2P"'; // Большой
+        uiCtx.fillStyle = '#e52424'; // Красный
+        uiCtx.textAlign = 'center';
+        uiCtx.textBaseline = 'middle';
+        uiCtx.fillText("PAUSE", uiCanvas.width / 2, uiCanvas.height / 2);
+        uiCtx.restore();
     }
 
     ctx.save();
@@ -276,11 +309,10 @@ function draw() {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-    // 2. Игровое поле (Через Renderer)
     drawMapLayers(ctx, game.sprites, serverState.map, Date.now()); 
-    drawBases(ctx, game.sprites, serverState.bases); // <--- Новая функция в renderer
+    drawBases(ctx, game.sprites, serverState.bases); 
     
-    drawBonus(ctx, game.sprites, serverState.bonus); // <--- Новая функция
+    drawBonus(ctx, game.sprites, serverState.bonus); 
 
     drawBullets(ctx, game.sprites, serverState.bullets);
     drawEnemies(ctx, game.sprites, serverState.enemies, serverState.pendingSpawns);
@@ -313,4 +345,11 @@ function draw() {
         ctx.textAlign = "center";
         ctx.fillText(`ROOM: ${currentRoomId}`, canvas.width / 2, 20);
     }
+    
+    const showNames = game.input.keys['Tab'] || (Date.now() - gameStartTime < 5000);
+    let myTeam = 0;
+    const me = Object.values(serverState.players).find(p => p.socketId === myId);
+    if (me) myTeam = me.team;
+
+    drawPlayerNames(uiCtx, serverState.players, showNames, serverState.map, myTeam);
 }

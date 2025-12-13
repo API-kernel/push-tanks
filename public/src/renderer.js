@@ -1,5 +1,6 @@
 import { SPRITES, TILE_SIZE } from './sprites.js';
 import { drawRotated } from './client_utils.js';
+import { PADDING } from '../shared/config.js'; 
 
 // --- КАРТА ---
 
@@ -106,7 +107,9 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
 
     if (enemies) {
         enemies.forEach(enemy => {
-            let key = enemy.spriteKey; // 'enemy_basic'
+            const color = (enemy.team === 1) ? 'yellow' : 'green';
+            let key = `bot_${color}_${enemy.spriteKey}`; // bot_yellow_basic
+
             if (enemy.isBonus) {
                 // Мигание каждые 10 кадров (быстро)
                 const blink = Math.floor(Date.now() / 150) % 2;
@@ -150,10 +153,11 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
             }
         } else {
             // Танк
+            const color = (p.team === 1) ? 'yellow' : 'green';
             const lvl = p.level || 1;
-            const key = `player_lvl${lvl}`;
-            const frames = SPRITES[key] || SPRITES.player_lvl1;
+            const key = `player_${color}_lvl${lvl}`;
 
+            const frames = SPRITES[key] || SPRITES[`player_${color}_lvl1`];
             if (frames) {
                 const idx = p.frameIndex || 0;
                 const frame = frames[idx];
@@ -178,6 +182,65 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
             }
         }
     });
+}
+export function drawPlayerNames(ctx, playersMap, showNames, map, myTeam) {
+    if (!playersMap) return;
+
+    const SCALE = 3;
+    const GAME_PADDING = 32;
+
+    ctx.save();
+    ctx.font = 'bold 10px "Press Start 2P", monospace'; // 10px лучше читается
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = '#a42020';
+    ctx.lineWidth = 4;
+
+    Object.values(playersMap).forEach(p => {
+        if (p.isDead || !p.nickname) return;
+        
+        // --- ПРОВЕРКА ЛЕСА ---
+        if (map) {
+            const col = Math.floor((p.x + 8) / 16);
+            const row = Math.floor((p.y + 8) / 16);
+            
+            if (map[row] && map[row][col] === 3) { // 3 = Лес
+                if (p.team !== myTeam) return; 
+            }
+        }
+        
+        if (!showNames) return; // Обычная логика скрытия (если не TAB и не старт)
+
+        // Центр танка в экранных координатах
+        const cx = (p.x + GAME_PADDING + 8) * SCALE;
+        const cy = (p.y + GAME_PADDING + 8) * SCALE;
+
+        const offset = 38; // Отступ (чуть больше, чтобы не наезжать)
+
+        let ty;
+        
+        // Логика выбора стороны
+        // По умолчанию:
+        // Team 1 (Green) -> Ник СНИЗУ (cy + offset)
+        // Team 2 (Red)   -> Ник СВЕРХУ (cy - offset)
+        
+        if (p.team === 1) {
+            // Зеленые: Снизу, если не едут ВНИЗ (чтобы не перекрывать путь)
+            if (p.direction === 'DOWN') ty = cy - offset; // Прыгаем наверх
+            else ty = cy + offset; // Обычно внизу
+        } else {
+            // Красные: Сверху, если не едут ВВЕРХ
+            if (p.direction === 'UP') ty = cy + offset; // Прыгаем вниз
+            else ty = cy - offset; // Обычно сверху
+        }
+
+        // Рисуем
+        ctx.strokeText(p.nickname, cx, ty);
+        ctx.fillText(p.nickname, cx, ty);
+    });
+    
+    ctx.restore();
 }
 
 // --- ВЗРЫВЫ (Локальная система частиц) ---
