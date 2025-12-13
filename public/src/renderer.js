@@ -1,6 +1,6 @@
-import { SPRITES, TILE_SIZE } from './sprites.js';
+import { SPRITES } from './sprites.js';
+import { TILE_SIZE, TILE_BIG_SIZE } from '../shared/config.js';
 import { drawRotated } from './client_utils.js';
-import { PADDING } from '../shared/config.js'; 
 
 // --- КАРТА ---
 
@@ -8,35 +8,58 @@ export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
     if (!levelMap) return;
     const waterFrame = Math.floor(gameTime / 1000) % 2;
 
+    const SUB_SIZE = 4; // Размер микро-блока
+
     for (let row = 0; row < levelMap.length; row++) {
         for (let col = 0; col < levelMap[row].length; col++) {
             const block = levelMap[row][col];
             
-            if (block === 3) continue; // Лес рисуем позже
+            if (block === 3) continue; // Лес
 
             if (typeof block === 'object') {
                 const baseSprite = SPRITES.blocks[block.type]; 
                 if (!baseSprite) continue;
+                // Вычисляем смещение текстуры
+                const texOffX = (col % 2) * 8;
+                const texOffY = (row % 2) * 8;
+                
                 const [bx, by] = baseSprite;
-                const subSize = 4;
-                for (let r = 0; r < 4; r++) {
-                    for (let c = 0; c < 4; c++) {
-                        if ((block.mask & (1 << (r * 4 + c))) !== 0) {
-                            ctx.drawImage(spritesImage, bx + c * subSize, by + r * subSize, subSize, subSize, col * 16 + c * subSize, row * 16 + r * subSize, subSize, subSize);
+                
+                // Рисуем 4 микро-блока (2x2)
+                for (let r = 0; r < 2; r++) {
+                    for (let c = 0; c < 2; c++) {
+                        // Маска 4 бита: 0, 1 (верх), 2, 3 (низ)
+                        const bitIndex = r * 2 + c;
+                        
+                        if ((block.mask & (1 << bitIndex)) !== 0) {
+                            ctx.drawImage(
+                                spritesImage, 
+                                bx + texOffX + c * SUB_SIZE, 
+                                by + texOffY + r * SUB_SIZE, 
+                                SUB_SIZE, SUB_SIZE, 
+                                col * TILE_SIZE + c * SUB_SIZE, 
+                                row * TILE_SIZE + r * SUB_SIZE, 
+                                SUB_SIZE, SUB_SIZE
+                            );
                         }
                     }
                 }
             } else {
                 if (block === 4) { // Вода
                     const frames = SPRITES.blocks[4]; 
-                    const [sx, sy, sw, sh] = frames[waterFrame];
-                    ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    const [sx, sy] = frames[waterFrame];
+                    // Вода анимируется целиком 16x16, но мы рисуем кусочек 8x8
+                    const texOffX = (col % 2) * 8;
+                    const texOffY = (row % 2) * 8;
+                    ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
                 } 
-                else if (block !== 0) { // Лед и прочее
+                else if (block !== 0) { // Лед, Лес (если бы рисовали)
                     const spriteCoords = SPRITES.blocks[block];
                     if (spriteCoords) {
-                        const [sx, sy, sw, sh] = spriteCoords;
-                        ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        const [sx, sy] = spriteCoords;
+                        const texOffX = (col % 2) * 8;
+                        const texOffY = (row % 2) * 8;
+                        ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
                     }
                 }
             }
@@ -46,14 +69,14 @@ export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
 
 export function drawForest(ctx, spritesImage, levelMap) {
     if (!levelMap) return;
-    const forestSprite = SPRITES.blocks[3]; 
+    const [sx, sy] = SPRITES.blocks[3]; 
 
     for (let row = 0; row < levelMap.length; row++) {
         for (let col = 0; col < levelMap[row].length; col++) {
-            const block = levelMap[row][col];
-            if (block === 3) {
-                const [sx, sy, sw, sh] = forestSprite;
-                ctx.drawImage(spritesImage, sx, sy, sw, sh, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            if (levelMap[row][col] === 3) {
+                const texOffX = (col % 2) * 8;
+                const texOffY = (row % 2) * 8;
+                ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
             }
         }
     }
@@ -65,7 +88,7 @@ export function drawBases(ctx, spritesImage, bases) {
     if (!bases) return;
     bases.forEach(base => {
         const baseSprite = base.isDead ? SPRITES.base.dead : SPRITES.base.alive;
-        ctx.drawImage(spritesImage, ...baseSprite, base.x, base.y, 16, 16);
+        ctx.drawImage(spritesImage, ...baseSprite, base.x, base.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
     });
 }
 
@@ -74,7 +97,7 @@ export function drawBonus(ctx, spritesImage, bonus) {
     // Можно добавить мигание, если есть таймер
     const coords = SPRITES.bonuses[bonus.type];
     if (coords) {
-        ctx.drawImage(spritesImage, ...coords, bonus.x, bonus.y, 16, 16);
+        ctx.drawImage(spritesImage, ...coords, bonus.x, bonus.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
     }
 }
 
@@ -100,7 +123,7 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
             const frame = SPRITES.spawn_appear[idx];
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
-                ctx.drawImage(spritesImage, sx, sy, sw, sh, s.x, s.y, TILE_SIZE, TILE_SIZE);
+                ctx.drawImage(spritesImage, sx, sy, sw, sh, s.x, s.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
             }
         });
     }
@@ -128,7 +151,7 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
                     drawRotated(
                         ctx, spritesImage, 
                         sx, sy, sw, sh, 
-                        Math.round(enemy.x), Math.round(enemy.y), TILE_SIZE, TILE_SIZE,
+                        Math.round(enemy.x), Math.round(enemy.y), TILE_BIG_SIZE, TILE_BIG_SIZE,
                         enemy.direction
                     );
                 }
@@ -149,7 +172,7 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
             const frame = SPRITES.spawn_appear[idx];
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
-                ctx.drawImage(spritesImage, sx, sy, sw, sh, p.x, p.y, TILE_SIZE, TILE_SIZE);
+                ctx.drawImage(spritesImage, sx, sy, sw, sh, p.x, p.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
             }
         } else {
             // Танк
@@ -166,7 +189,7 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
                     drawRotated(
                         ctx, spritesImage,
                         sx, sy, sw, sh,
-                        Math.round(p.x), Math.round(p.y), TILE_SIZE, TILE_SIZE,
+                        Math.round(p.x), Math.round(p.y), TILE_BIG_SIZE, TILE_BIG_SIZE,
                         p.direction
                     );
                 }
@@ -177,7 +200,7 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
                 const shieldFrame = SPRITES.shield[shieldFrameIndex];
                 if (shieldFrame) {
                     const [sx, sy, sw, sh] = shieldFrame;
-                    ctx.drawImage(spritesImage, sx, sy, sw, sh, Math.round(p.x), Math.round(p.y), TILE_SIZE, TILE_SIZE);
+                    ctx.drawImage(spritesImage, sx, sy, sw, sh, Math.round(p.x), Math.round(p.y), TILE_BIG_SIZE, TILE_BIG_SIZE);
                 }
             }
         }

@@ -1,7 +1,8 @@
-export const TILE_SIZE = 16;
+export const TILE_SIZE = 8;
+export const TILE_BIG_SIZE = 16;
 
-export const MAP_ROWS = 13;
-export const MAP_COLS = 13;
+export const MAP_ROWS = 26;
+export const MAP_COLS = 26;
 export const PADDING = 32;
 export const HUD_WIDTH = 32;
 
@@ -15,7 +16,7 @@ export const SPAWN_DELAY = 120;
 export const SPAWN_ANIMATION_DURATION = 60; 
 export const SHIELD_DURATION = 180; 
 
-export const SPAWN_COLUMNS = [0, 4, 8, 12];
+export const SPAWN_COLUMNS = [0, 8, 16, 24];
 
 // Просто массив настроек.
 export const TEAMS_CONFIG = [
@@ -23,15 +24,15 @@ export const TEAMS_CONFIG = [
         id: 1,
         name: 'GREEN',
         maxUnits: 4, 
-        baseXY: { x: 6, y: 12 }, 
-        spawnY: 12,              
+        baseXY: { x: 12, y: 24 }, 
+        spawnY: 24,              
         direction: 'UP'          
     },
     {
         id: 2,
         name: 'RED',
         maxUnits: 4,
-        baseXY: { x: 6, y: 0 },
+        baseXY: { x: 12, y: 0 },
         spawnY: 0,
         direction: 'DOWN'
     }
@@ -59,29 +60,20 @@ export const HELMET_DURATION = 300;
 export const SHOVEL_DURATION = 1000;
 export const CLOCK_DURATION  = 600;
 
-// Маски стен
-export const WALL_MASKS = {
-    LEFT:   0x3333,
-    RIGHT:  0xCCCC,
-    TOP:    0x00FF,
-    BOTTOM: 0xFF00,
-    FULL:   0xFFFF
-};
+export const BLOCK_FULL = 0xF; // 1111
 
-// Стены вокруг баз
 export const BASE_WALLS = {
-    [1]: [ // GREEN (Низ)
-        { r: 12, c: 5, mask: WALL_MASKS.RIGHT },
-        { r: 11, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.BOTTOM },
-        { r: 11, c: 6, mask: WALL_MASKS.BOTTOM },
-        { r: 11, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.BOTTOM },
-        { r: 12, c: 7, mask: WALL_MASKS.LEFT }
+    [1]: [ // Низ
+        // Слева
+        {r:25,c:11}, {r:24,c:11}, {r:23,c:11},
+        // Верх
+        {r:23,c:12}, {r:23,c:13},
+        // Справа
+        {r:23,c:14}, {r:24,c:14}, {r:25,c:14}
     ],
-    [2]: [ // RED (Верх)
-        { r: 0, c: 5, mask: WALL_MASKS.RIGHT },
-        { r: 1, c: 5, mask: WALL_MASKS.RIGHT & WALL_MASKS.TOP },
-        { r: 1, c: 6, mask: WALL_MASKS.TOP },
-        { r: 1, c: 7, mask: WALL_MASKS.LEFT & WALL_MASKS.TOP },
-        { r: 0, c: 7, mask: WALL_MASKS.LEFT }
+    [2]: [ // Верх
+        {r:0,c:11}, {r:1,c:11}, {r:2,c:11},
+        {r:2,c:12}, {r:2,c:13},
+        {r:2,c:14}, {r:1,c:14}, {r:0,c:14}
     ]
 };

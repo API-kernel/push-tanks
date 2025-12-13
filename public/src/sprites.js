@@ -1,9 +1,9 @@
-export const TILE_SIZE = 16;
+import { TILE_BIG_SIZE } from '../shared/config.js';
 
 function getTankFrames(row, colStart) {
     return [
-        [colStart * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE],
-        [(colStart + 1) * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE]
+        [colStart * TILE_BIG_SIZE, row * TILE_BIG_SIZE, TILE_BIG_SIZE, TILE_BIG_SIZE],
+        [(colStart + 1) * TILE_BIG_SIZE, row * TILE_BIG_SIZE, TILE_BIG_SIZE, TILE_BIG_SIZE]
     ];
 }
 

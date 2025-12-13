@@ -338,7 +338,7 @@ export class GameRoom {
     }
 
     getPlayerSpawnPoint(pIndex, teamId) {
-        const priority = [4, 8, 0, 12];
+        const priority = [8, 16, 0, 24];
         const col = priority[pIndex % priority.length];
         const team = this.teamManager.getTeam(teamId);
         const y = team ? team.spawnPixelY : 0;

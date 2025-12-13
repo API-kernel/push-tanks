@@ -1,10 +1,10 @@
-import { TILE_SIZE } from './config.js';
+import { TILE_SIZE, TILE_BIG_SIZE } from './config.js';
 import { canMoveTo } from './physics.js';
 
 export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, onCheckCollision) {
     // --- ЛЕД ---
-    const cx = Math.floor((tank.x + 8) / 16);
-    const cy = Math.floor((tank.y + 8) / 16);
+    const cx = Math.floor((tank.x + TILE_SIZE) / TILE_SIZE);
+    const cy = Math.floor((tank.y + TILE_SIZE) / TILE_SIZE);
     // Проверка границ массива
     let isOnIce = false;
     if (map && map[cy] && map[cy][cx] === 5) isOnIce = true;
@@ -40,7 +40,8 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
 
     const isInsideMap =
         nextX >= 0 && nextY >= 0 &&
-        nextX <= gameWidth - TILE_SIZE && nextY <= gameHeight - TILE_SIZE;
+        nextX <= gameWidth - TILE_BIG_SIZE && 
+        nextY <= gameHeight - TILE_BIG_SIZE;  
 
     if (!isInsideMap) {
         tank.isMoving = false;

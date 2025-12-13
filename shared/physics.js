@@ -10,20 +10,21 @@ function checkRectIntersection(r1, r2) {
 }
 
 export function canMoveTo(newX, newY, map) {
-    if (!map) return true; // Если карты нет, едем
+    if (!map) return true;
 
-    const tankRect = { x: newX + 1, y: newY + 1, w: TILE_SIZE - 2, h: TILE_SIZE - 2 };
+    // Танк 14x14 (с отступами)
+    const tankRect = { x: newX + 1, y: newY + 1, w: 14, h: 14 };
 
+    // Индексы сетки (8px)
     const startCol = Math.floor(tankRect.x / TILE_SIZE);
     const endCol   = Math.floor((tankRect.x + tankRect.w) / TILE_SIZE);
     const startRow = Math.floor(tankRect.y / TILE_SIZE);
     const endRow   = Math.floor((tankRect.y + tankRect.h) / TILE_SIZE);
 
-    const subSize = 4;
+    const SUB_SIZE = 4; // Микро-блок
 
     for (let row = startRow; row <= endRow; row++) {
         for (let col = startCol; col <= endCol; col++) {
-            // Проверка границ массива карты
             if (row < 0 || row >= map.length || col < 0 || col >= map[0].length) continue;
 
             const cell = map[row][col];
@@ -34,16 +35,22 @@ export function canMoveTo(newX, newY, map) {
 
             if (typeof cell === 'object') {
                 if (cell.mask === 0) continue;
-                for (let r = 0; r < 4; r++) {
-                    for (let c = 0; c < 4; c++) {
-                        if ((cell.mask & (1 << (r * 4 + c))) !== 0) {
-                            const subRect = { x: blockX + c * subSize, y: blockY + r * subSize, w: subSize, h: subSize };
+                // Проверяем 4 микро-блока (2x2)
+                for (let r = 0; r < 2; r++) {
+                    for (let c = 0; c < 2; c++) {
+                        if ((cell.mask & (1 << (r * 2 + c))) !== 0) {
+                            const subRect = { 
+                                x: blockX + c * SUB_SIZE, 
+                                y: blockY + r * SUB_SIZE, 
+                                w: SUB_SIZE, h: SUB_SIZE 
+                            };
                             if (checkRectIntersection(tankRect, subRect)) return false;
                         }
                     }
                 }
             } else if (cell === 4) {
-                const waterRect = { x: blockX, y: blockY, w: 16, h: 16 };
+                // Вода 8x8
+                const waterRect = { x: blockX, y: blockY, w: 8, h: 8 };
                 if (checkRectIntersection(tankRect, waterRect)) return false;
             }
         }

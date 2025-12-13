@@ -1,5 +1,6 @@
-import { SPRITES, TILE_SIZE } from './sprites.js';
-import { MAP_WIDTH, PADDING } from '../shared/config.js';
+import { SPRITES } from './sprites.js';
+import { MAP_WIDTH } from '../shared/config.js';
+import { TILE_SIZE } from '../shared/config.js';
 
 // Хелпер для отрисовки цифр (черных)
 // Учитывает, что 0-4 на одной строке, 5-9 на следующей

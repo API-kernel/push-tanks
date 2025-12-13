@@ -44,7 +44,7 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
         const stepY = (b.direction === 'UP' ? -b.speed : (b.direction === 'DOWN' ? b.speed : 0)) / steps;
 
         for (let s = 0; s < steps; s++) {
-            // Если пуля уже в стене (сразу после рождения или предыдущего шага)
+            // Проверка перед шагом
             let collisionResult = checkCollisionAndDestroy(b, map);
             if (collisionResult) {
                 events.push({ 
@@ -55,14 +55,12 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
                     isSteelNoDmg: collisionResult === 'STEEL_NO_DMG',
                     level: b.ownerLevel
                 });
-                break; // Выход из шагов
+                break; 
             }
 
-            // --- ДВИЖЕНИЕ ---
             b.x += stepX;
             b.y += stepY;
 
-            // Проверка границ
             if (b.x < 0 || b.y < 0 || b.x > gameWidth || b.y > gameHeight) {
                 b.isDead = true;
                 events.push({ type: 'WALL_HIT', x: b.x, y: b.y, ownerId: b.ownerId });
@@ -78,7 +76,6 @@ function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
-// Принимает map
 function checkCollisionAndDestroy(bullet, map) {
     if (bullet.isDead) return false;
 
@@ -93,15 +90,16 @@ function checkCollisionAndDestroy(bullet, map) {
 
     const bulletRect = { x: bullet.x, y: bullet.y, w: bullet.width, h: bullet.height };
 
+    // 1. HIT TEST (Ищем контакт)
     for (let row = startRow; row <= endRow; row++) {
         for (let col = startCol; col <= endCol; col++) {
             if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
                 let block = map[row][col];
                 if (typeof block !== 'object' || block.mask === 0) continue; 
 
-                for (let r = 0; r < 4; r++) {
-                    for (let c = 0; c < 4; c++) {
-                        if ((block.mask & (1 << (r * 4 + c))) !== 0) {
+                for (let r = 0; r < 2; r++) {
+                    for (let c = 0; c < 2; c++) {
+                        if ((block.mask & (1 << (r * 2 + c))) !== 0) {
                             const subX = col * TILE_SIZE + c * 4;
                             const subY = row * TILE_SIZE + r * 4;
                             const subRect = { x: subX, y: subY, w: 4, h: 4 };
@@ -110,6 +108,7 @@ function checkCollisionAndDestroy(bullet, map) {
                                 hitDetected = true;
                                 if (block.type === 2) isSteelHit = true;
 
+                                // Находим грань стены (Contact Edge)
                                 if (bullet.direction === 'UP') {
                                     if (subY + 4 > contactEdge) contactEdge = subY + 4;
                                 } else if (bullet.direction === 'DOWN') {
@@ -129,14 +128,16 @@ function checkCollisionAndDestroy(bullet, map) {
 
     if (!hitDetected) return false;
 
+    // FRIENDLY FIRE
     if (bullet.ownerId >= 1000) {
         const bRow = Math.floor(bullet.y / TILE_SIZE);
         const bCol = Math.floor(bullet.x / TILE_SIZE);
-        if (bullet.team === 2 && bRow <= 2 && bCol >= 5 && bCol <= 7) {
+        // Координаты защиты базы для карты 26x26
+        if (bullet.team === 2 && bRow <= 3 && bCol >= 10 && bCol <= 15) {
             bullet.isDead = true; 
             return 'FRIENDLY_WALL'; 
         }
-        if (bullet.team === 1 && bRow >= 10 && bCol >= 5 && bCol <= 7) {
+        if (bullet.team === 1 && bRow >= 22 && bCol >= 10 && bCol <= 15) {
             bullet.isDead = true;
             return 'FRIENDLY_WALL'; 
         }
@@ -145,92 +146,78 @@ function checkCollisionAndDestroy(bullet, map) {
     bullet.isDead = true;
     if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL_NO_DMG';
 
-    // --- DESTRUCTION LOGIC ---
+    // 2. APPLY DAMAGE (ИНДЕКСНЫЙ МЕТОД)
+    
     const cx = bullet.x + bullet.width / 2;
     const cy = bullet.y + bullet.height / 2;
-    const lateralSnap = isSteelHit ? 8 : 4;
-
-    let snapX = cx;
-    let snapY = cy;
-
-    if (bullet.direction === 'UP' || bullet.direction === 'DOWN') {
-        snapX = Math.round(cx / lateralSnap) * lateralSnap; 
-    } else {
-        snapY = Math.round(cy / lateralSnap) * lateralSnap;
-    }
-
+    
+    // Snap to 8px grid (Центр коридора 16px)
+    const snapX = Math.round(cx / 8) * 8;
+    let snapY = Math.round(cy / 8) * 8;
+    
     const spread = 16;
     const depth = (isSteelHit || bullet.ownerLevel >= 4) ? 8 : 4;
-
-    let damageRect = { x: 0, y: 0, w: 0, h: 0 };
+    
+    // Вычисляем координаты уничтожаемой области
+    let areaL, areaR, areaT, areaB; // Границы (Left, Right, Top, Bottom)
 
     if (bullet.direction === 'UP') {
-        damageRect.x = snapX - (spread / 2);
-        damageRect.w = spread;
-        damageRect.y = contactEdge - depth;
-        damageRect.h = depth;
+        areaL = snapX - spread/2;
+        areaR = snapX + spread/2;
+        areaT = contactEdge - depth;
+        areaB = contactEdge;
     } else if (bullet.direction === 'DOWN') {
-        damageRect.x = snapX - (spread / 2);
-        damageRect.w = spread;
-        damageRect.y = contactEdge;
-        damageRect.h = depth;
+        areaL = snapX - spread/2;
+        areaR = snapX + spread/2;
+        areaT = contactEdge;
+        areaB = contactEdge + depth;
     } else if (bullet.direction === 'LEFT') {
-        damageRect.y = snapY - (spread / 2);
-        damageRect.h = spread;
-        damageRect.x = contactEdge - depth;
-        damageRect.w = depth;
+        // Для горизонтали снеппинг по Y
+        snapY = Math.round(cy / 8) * 8;
+        areaT = snapY - spread/2;
+        areaB = snapY + spread/2;
+        areaL = contactEdge - depth;
+        areaR = contactEdge;
     } else if (bullet.direction === 'RIGHT') {
-        damageRect.y = snapY - (spread / 2);
-        damageRect.h = spread;
-        damageRect.x = contactEdge;
-        damageRect.w = depth;
+        snapY = Math.round(cy / 8) * 8;
+        areaT = snapY - spread/2;
+        areaB = snapY + spread/2;
+        areaL = contactEdge;
+        areaR = contactEdge + depth;
     }
 
-    const dStartCol = Math.floor(damageRect.x / TILE_SIZE);
-    const dEndCol   = Math.floor((damageRect.x + damageRect.w) / TILE_SIZE);
-    const dStartRow = Math.floor(damageRect.y / TILE_SIZE);
-    const dEndRow   = Math.floor((damageRect.y + damageRect.h) / TILE_SIZE);
-
-    for (let row = dStartRow; row <= dEndRow; row++) {
-        for (let col = dStartCol; col <= dEndCol; col++) {
+    // Переводим пиксельные координаты области в индексы микро-блоков
+    // Микро-блоки идут с шагом 4px
+    
+    // Для надежности берем центр микро-блока (координата + 2)
+    // Проходимся по сетке 4px внутри области
+    for (let y = areaT; y < areaB; y += 4) {
+        for (let x = areaL; x < areaR; x += 4) {
+            
+            // Координаты центра микро-блока, который хотим удалить
+            const targetX = x + 2;
+            const targetY = y + 2;
+            
+            const col = Math.floor(targetX / TILE_SIZE);
+            const row = Math.floor(targetY / TILE_SIZE);
+            
+            // Проверка границ карты
             if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
                 let block = map[row][col];
                 
                 if (typeof block === 'object' && block.mask > 0) {
+                    // Бетон ломаем только мощным танком
                     if (block.type === 2 && bullet.ownerLevel < 4) continue;
-
-                    const blockX = col * TILE_SIZE;
-                    const blockY = row * TILE_SIZE;
-
-                    if (block.type === 2) {
-                        const quadrants = [
-                            { bits: [0,1,4,5],     x: blockX,   y: blockY,   w: 8, h: 8 }, 
-                            { bits: [2,3,6,7],     x: blockX+8, y: blockY,   w: 8, h: 8 }, 
-                            { bits: [8,9,12,13],   x: blockX,   y: blockY+8, w: 8, h: 8 }, 
-                            { bits: [10,11,14,15], x: blockX+8, y: blockY+8, w: 8, h: 8 }  
-                        ];
-                        for (let q of quadrants) {
-                            if (checkRectIntersection(damageRect, q)) {
-                                q.bits.forEach(b => block.mask &= ~(1 << b));
-                            }
-                        }
-                    } else {
-                        for (let r = 0; r < 4; r++) {
-                            for (let c = 0; c < 4; c++) {
-                                const bitIndex = r * 4 + c;
-                                if ((block.mask & (1 << bitIndex)) !== 0) {
-                                    const subRect = {
-                                        x: blockX + c * 4,
-                                        y: blockY + r * 4,
-                                        w: 4, h: 4
-                                    };
-                                    if (checkRectIntersection(damageRect, subRect)) {
-                                        block.mask &= ~(1 << bitIndex);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    
+                    // Вычисляем индекс микро-блока внутри тайла (0..3)
+                    const localX = Math.floor((targetX % TILE_SIZE) / 4);
+                    const localY = Math.floor((targetY % TILE_SIZE) / 4);
+                    const bitIndex = localY * 2 + localX;
+                    
+                    // Выключаем бит
+                    block.mask &= ~(1 << bitIndex);
+                    
+                    // Если блок пуст - удаляем
                     if (block.mask === 0) map[row][col] = 0;
                 }
             }
