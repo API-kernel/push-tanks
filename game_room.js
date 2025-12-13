@@ -74,6 +74,8 @@ export class GameRoom {
             direction: teamConfig ? teamConfig.direction : 'UP',
             isMoving: false, hp: 1, 
             lives: this.settings.startLives, 
+            frameIndex: 0,
+            frameTimer: 0,
             level: 1,
             isDead: false, respawnTimer: 0,
             isSpawning: true, spawnAnimTimer: 0,

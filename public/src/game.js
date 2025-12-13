@@ -55,6 +55,7 @@ window.tankGame = {
     changeName: (localIndex, name) => {
         socket.emit('change_nickname', { localIndex, name });
     },
+    initAudio: () => audio.resume(),
     addLocalPlayer: () => socket.emit('add_local_player'),
     removeLocalPlayer: (idx) => socket.emit('remove_local_player', idx),
     updateSettings: (settings) => socket.emit('update_settings', settings)
@@ -80,6 +81,7 @@ window.addEventListener('keydown', (e) => {
         socket.emit('toggle_pause');
     }
 });
+
 
 let gameStartTime = 0;
 socket.on('game_start', () => {
@@ -292,7 +294,6 @@ function draw() {
         return;
     }
 
-    console.log(serverState.isPaused);
     if (serverState.isPaused) {
         uiCtx.save();
         uiCtx.font = 'bold 40px "Press Start 2P"'; // Большой

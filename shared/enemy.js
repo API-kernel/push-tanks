@@ -8,8 +8,8 @@ import { spawnBonus } from './bonus.js';
 const ENEMY_TYPES = [
     { type: 'basic', spriteKey: 'basic', ...TANK_STATS.basic, bulletLvl: 1 },
     { type: 'fast',  spriteKey: 'fast',  ...TANK_STATS.fast,  bulletLvl: 1 },
+    { type: 'armor', spriteKey: 'armor', ...TANK_STATS.armor, bulletLvl: 2 },
     { type: 'heavy', spriteKey: 'heavy', ...TANK_STATS.heavy, bulletLvl: 2 },
-    { type: 'armor', spriteKey: 'armor', ...TANK_STATS.armor, bulletLvl: 2 }
 ];
 
 export function hitEnemy(room, index) {
@@ -156,6 +156,8 @@ function spawnTankFromStar(room, star) {
         bulletLvl: template.bulletLvl,
         isMoving: true,
         bulletTimer: 60,
+        frameIndex: 0,
+        frameTimer: 0,
         isBonus: isBonus
     });
 }

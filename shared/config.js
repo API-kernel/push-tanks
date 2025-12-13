@@ -41,8 +41,8 @@ export const TANK_STATS = {
     player: { speed: 1.0, hp: 1, bulletSpeed: 3, bulletSpeedFast: 5 },
     basic:  { speed: 0.6, hp: 1, bulletSpeed: 3 },
     fast:   { speed: 1.2, hp: 1, bulletSpeed: 3 },
-    heavy:  { speed: 0.6, hp: 1, bulletSpeed: 5 },
-    armor:  { speed: 0.5, hp: 4, bulletSpeed: 5 }
+    armor:  { speed: 0.5, hp: 1, bulletSpeed: 5 },
+    heavy:  { speed: 0.6, hp: 3, bulletSpeed: 5 },
 };
 
 export const BONUS_WEIGHTS = {

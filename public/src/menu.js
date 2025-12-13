@@ -8,7 +8,6 @@ window.setMyId = (id) => { mySocketId = id; };
 
 // Функция смены команды (отправляет на сервер)
 window.changeTeam = (localIndex, teamId) => {
-    console.log("Clicked!");
     if (window.tankGame) window.tankGame.changeTeam(localIndex, teamId);
 };
 
@@ -176,6 +175,7 @@ function createRoom() {
     // Так как game.js - модуль, мы не можем просто вызвать функцию оттуда.
     // Решение: game.js при старте повесит свои методы на window.tankGame
     if (window.tankGame) {
+        window.tankGame.initAudio();
         window.tankGame.createRoom(localPlayersCount);
     }
 }
@@ -187,12 +187,12 @@ function joinRoom() {
         return;
     }
     if (window.tankGame) {
+        window.tankGame.initAudio();
         window.tankGame.joinRoom(code, localPlayersCount);
     }
 }
 
 function startGame() {
-    console.log("Clicked!");
     if (window.tankGame) {
         window.tankGame.requestStart();
     }
@@ -218,6 +218,7 @@ window.hideMenu = () => {
 
 function quickPlay() {
     if (window.tankGame) {
+        window.tankGame.initAudio();
         window.tankGame.quickPlay(localPlayersCount);
     }
 }

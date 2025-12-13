@@ -71,7 +71,8 @@ export class BattleSystem {
                             if (idx !== -1) {
                                 wasBonus = tank.isBonus;
                                 // Передаем this.room в hitEnemy
-                                isDead = hitEnemy(this.room, idx);
+                                const res = hitEnemy(this.room, idx);
+                                isDead = res.isDead;
                             }
                         }
 

@@ -22,20 +22,17 @@ const SOUNDS = {
 
 class AudioManager {
     constructor() {
-        // Создаем контекст (он будет suspended до первого клика)
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.buffers = {}; // Кэш загруженных звуков
-        this.isLoaded = false;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
         
-        // Активные источники звука (для остановки лупов)
-        // { playerId: { idle: SourceNode, move: SourceNode, currentType: 'idle'|'move' } }
-        this.activeEngines = {}; 
+        this.buffers = {};
+        this.activeEngines = {};
+        
+        // Начинаем грузить звуки СРАЗУ при загрузке страницы
+        this.loadAll();
     }
 
-    // Загрузка всех звуков при старте
     async loadAll() {
-        if (this.isLoaded) return;
-
         const promises = Object.entries(SOUNDS).map(async ([key, url]) => {
             try {
                 const response = await fetch(url);
@@ -46,31 +43,40 @@ class AudioManager {
                 console.error(`Failed to load sound: ${key}`, e);
             }
         });
-
         await Promise.all(promises);
-        this.isLoaded = true;
-        console.log("Audio loaded");
+        console.log("All sounds loaded");
     }
 
-    // Метод для "разморозки" аудио контекста по клику
+    // ЭТОТ МЕТОД НУЖНО ВЫЗВАТЬ ПРИ ЛЮБОМ КЛИКЕ
     resume() {
         if (this.ctx.state === 'suspended') {
-            this.ctx.resume();
+            this.ctx.resume().then(() => {
+                console.log("AudioContext resumed!");
+            });
+            
+            // Хак: проиграть тишину, чтобы точно разбудить мобильные браузеры
+            const oscillator = this.ctx.createOscillator();
+            oscillator.frequency.value = 440;
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0;
+            oscillator.connect(gain);
+            gain.connect(this.ctx.destination);
+            oscillator.start(0);
+            oscillator.stop(0.1);
         }
-        this.loadAll(); // Запускаем загрузку, если еще не начали
     }
 
     play(name) {
-        if (!this.isLoaded || !this.buffers[name]) return;
+        if (!this.buffers[name]) return;
         
-        // Создаем источник
+        // Если контекст все еще спит - пытаемся будить (попытка не пытка)
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
         const source = this.ctx.createBufferSource();
         source.buffer = this.buffers[name];
         
-        // Подключаем к выходу (динамикам)
-        // Можно добавить GainNode для громкости
         const gainNode = this.ctx.createGain();
-        gainNode.gain.value = 0.4; // Громкость эффектов
+        gainNode.gain.value = 0.4;
         
         source.connect(gainNode);
         gainNode.connect(this.ctx.destination);
@@ -79,39 +85,27 @@ class AudioManager {
     }
 
     updateEngine(playerId, isMoving) {
-        if (!this.isLoaded) return;
-        
-        // Инициализируем структуру для игрока
+        // ... (код без изменений) ...
+        // Скопируй из прошлой версии, там все ок
         if (!this.activeEngines[playerId]) {
             this.activeEngines[playerId] = { source: null, type: null };
         }
-
         const engine = this.activeEngines[playerId];
         const neededType = isMoving ? 'move' : 'idle';
-
-        // Если звук уже играет и он правильный - выходим
         if (engine.source && engine.type === neededType) return;
-
-        // Останавливаем старый звук
         if (engine.source) {
             try { engine.source.stop(); } catch(e){}
             engine.source = null;
         }
-
-        // Запускаем новый
         if (this.buffers[neededType]) {
             const source = this.ctx.createBufferSource();
             source.buffer = this.buffers[neededType];
-            source.loop = true; // ИДЕАЛЬНЫЙ ЛУП
-            
+            source.loop = true;
             const gainNode = this.ctx.createGain();
-            gainNode.gain.value = 0.2; // Мотор потише
-            
+            gainNode.gain.value = 0.2;
             source.connect(gainNode);
             gainNode.connect(this.ctx.destination);
-            
             source.start(0);
-            
             engine.source = source;
             engine.type = neededType;
         }
@@ -128,13 +122,3 @@ class AudioManager {
 }
 
 export const audio = new AudioManager();
-
-// Хак для автозапуска
-const unlockAudio = () => {
-    audio.resume();
-    window.removeEventListener('keydown', unlockAudio);
-    window.removeEventListener('click', unlockAudio);
-};
-
-window.addEventListener('keydown', unlockAudio);
-window.addEventListener('click', unlockAudio);
