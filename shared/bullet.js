@@ -139,65 +139,70 @@ function checkCollisionAndDestroy(bullet, map, teamManager) {
             return 'FRIENDLY_WALL'; 
         }
     }
+
     bullet.isDead = true;
     if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL_NO_DMG';
 
-    // 2. APPLY DAMAGE (ИНДЕКСНЫЙ МЕТОД)
+    // 2. DISCRETE DESTRUCTION (Дискретное разрушение)
+    // Мы не используем прямоугольники, мы вычисляем индексы точек для удаления.
     
     const cx = bullet.x + bullet.width / 2;
     const cy = bullet.y + bullet.height / 2;
+
+    // Настраиваем привязку. 4px для кирпича, 8px для бетона.
+    const snapSize = isSteelHit ? 8 : 4;
     
-    // Snap to 8px grid (Центр коридора 16px)
-    const snapX = Math.round(cx / 8) * 8;
-    let snapY = Math.round(cy / 8) * 8;
-    
-    const spread = 16;
-    const depth = (isSteelHit || bullet.ownerLevel >= 4) ? 8 : 4;
-    
-    // Вычисляем координаты уничтожаемой области
-    let areaL, areaR, areaT, areaB; // Границы (Left, Right, Top, Bottom)
+    let startX, startY, widthX, widthY;
+    const spread = 16; // Ширина
+    const depth = (isSteelHit || bullet.ownerLevel >= 4) ? 8 : 4; // Глубина
 
     if (bullet.direction === 'UP') {
-        areaL = snapX - spread/2;
-        areaR = snapX + spread/2;
-        areaT = contactEdge - depth;
-        areaB = contactEdge;
+        const snapX = Math.round(cx / snapSize) * snapSize;
+        startX = snapX - (spread / 2);
+        widthX = spread;
+        
+        // По Y идем от грани вверх
+        startY = contactEdge - depth; 
+        widthY = depth;
+        
     } else if (bullet.direction === 'DOWN') {
-        areaL = snapX - spread/2;
-        areaR = snapX + spread/2;
-        areaT = contactEdge;
-        areaB = contactEdge + depth;
+        const snapX = Math.round(cx / snapSize) * snapSize;
+        startX = snapX - (spread / 2);
+        widthX = spread;
+        
+        startY = contactEdge; // От грани вниз
+        widthY = depth;
+
     } else if (bullet.direction === 'LEFT') {
-        // Для горизонтали снеппинг по Y
-        snapY = Math.round(cy / 8) * 8;
-        areaT = snapY - spread/2;
-        areaB = snapY + spread/2;
-        areaL = contactEdge - depth;
-        areaR = contactEdge;
+        const snapY = Math.round(cy / snapSize) * snapSize;
+        startY = snapY - (spread / 2);
+        widthY = spread;
+        
+        startX = contactEdge - depth;
+        widthX = depth;
+
     } else if (bullet.direction === 'RIGHT') {
-        snapY = Math.round(cy / 8) * 8;
-        areaT = snapY - spread/2;
-        areaB = snapY + spread/2;
-        areaL = contactEdge;
-        areaR = contactEdge + depth;
+        const snapY = Math.round(cy / snapSize) * snapSize;
+        startY = snapY - (spread / 2);
+        widthY = spread;
+        
+        startX = contactEdge;
+        widthX = depth;
     }
 
-    // Переводим пиксельные координаты области в индексы микро-блоков
-    // Микро-блоки идут с шагом 4px
-    
-    // Для надежности берем центр микро-блока (координата + 2)
-    // Проходимся по сетке 4px внутри области
-    for (let y = areaT; y < areaB; y += 4) {
-        for (let x = areaL; x < areaR; x += 4) {
+    // ТЕПЕРЬ САМОЕ ВАЖНОЕ: Проходимся шагами по 4px
+    // И удаляем микро-блоки, центр которых попадает в эти точки.
+    // Добавляем +2 (половина 4px), чтобы брать центр микро-блока.
+
+    for (let dy = 0; dy < widthY; dy += 4) {
+        for (let dx = 0; dx < widthX; dx += 4) {
             
-            // Координаты центра микро-блока, который хотим удалить
-            const targetX = x + 2;
-            const targetY = y + 2;
-            
+            const targetX = startX + dx + 2;
+            const targetY = startY + dy + 2;
+
             const col = Math.floor(targetX / TILE_SIZE);
             const row = Math.floor(targetY / TILE_SIZE);
-            
-            // Проверка границ карты
+
             if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
                 let block = map[row][col];
                 

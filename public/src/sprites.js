@@ -66,10 +66,10 @@ export const SPRITES = {
         5: [288, 32, 16, 16], // Лед
         6: [256 + 8, 0, 8, 16] 
     },
-    base: {
-        alive: [304, 32, 16, 16],
-        dead:  [320, 32, 16, 16]
-    },
+    base_yellow_alive: [304, 32, 16, 16], 
+    base_yellow_dead:  [320, 32, 16, 16],
+    base_green_alive:  [304, 48, 16, 16],
+    base_green_dead:   [320, 48, 16, 16],
     shield: [
         [256, 144, 16, 16],
         [272, 144, 16, 16]

@@ -210,20 +210,19 @@ input {
     transition: all 0.2s;
 }
 
-/* Активная Зеленая */
+/* YELLOW */
+.team-btn-yellow.active {
+    border-color: #e6c629;
+    background-color: #e6c629;
+    color: black;
+    box-shadow: 0 0 8px #e6c629;
+}
+
+/* GREEN */
 .team-btn-green.active {
     border-color: #63db44;
     background-color: #63db44;
     color: black;
-    box-shadow: 0 0 8px #63db44;
-}
-
-/* Активная Красная */
-.team-btn-red.active {
-    border-color: #d43333;
-    background-color: #d43333;
-    color: white;
-    box-shadow: 0 0 8px #d43333;
 }
 
 /* Кнопка удаления (крестик) */

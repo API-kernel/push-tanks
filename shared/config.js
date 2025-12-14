@@ -22,7 +22,7 @@ export const SPAWN_COLUMNS = [0, 8, 16, 24];
 export const TEAMS_CONFIG = [
     {
         id: 1,
-        name: 'GREEN',
+        name: 'YELLOW',
         maxUnits: 4, 
         baseXY: { x: 12, y: 24 }, 
         spawnY: 24,              
@@ -30,7 +30,7 @@ export const TEAMS_CONFIG = [
     },
     {
         id: 2,
-        name: 'RED',
+        name: 'GREEN',
         maxUnits: 4,
         baseXY: { x: 12, y: 0 },
         spawnY: 0,

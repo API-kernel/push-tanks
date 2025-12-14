@@ -87,8 +87,13 @@ export function drawForest(ctx, spritesImage, levelMap) {
 export function drawBases(ctx, spritesImage, bases) {
     if (!bases) return;
     bases.forEach(base => {
-        const baseSprite = base.isDead ? SPRITES.base.dead : SPRITES.base.alive;
-        ctx.drawImage(spritesImage, ...baseSprite, base.x, base.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
+        const teamName = (base.team === 1) ? 'yellow' : 'green';
+        const key = `base_${teamName}`;
+        
+        const state = base.isDead ? 'dead' : 'alive';
+        
+        const sprite = SPRITES[`${key}_${state}`]; 
+        ctx.drawImage(spritesImage, ...sprite, base.x, base.y, 16, 16);
     });
 }
 

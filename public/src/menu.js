@@ -126,11 +126,11 @@ window.updateLobbyList = (players) => {
         
         if (isMe) {
             // Кнопки команд с подсветкой
-            const greenClass = p.team === 1 ? 'team-btn team-btn-green active' : 'team-btn team-btn-green';
-            const redClass =   p.team === 2 ? 'team-btn team-btn-red active'   : 'team-btn team-btn-red';
+            const yClass = p.team === 1 ? 'team-btn team-btn-yellow active' : 'team-btn team-btn-yellow';
+            const gClass = p.team === 2 ? 'team-btn team-btn-green active' : 'team-btn team-btn-green';
             
-            actionsHtml += `<button class="${greenClass}" onclick="changeTeam(${p.localIndex}, 1)">GREEN</button>`;
-            actionsHtml += `<button class="${redClass}" onclick="changeTeam(${p.localIndex}, 2)">RED</button>`;
+            actionsHtml += `<button class="${yClass}" onclick="changeTeam(${p.localIndex}, 1)">YELLOW</button>`;
+            actionsHtml += `<button class="${gClass}" onclick="changeTeam(${p.localIndex}, 2)">GREEN</button>`;
             
             // Кнопка удаления
             if (p.localIndex > 0) {
@@ -140,8 +140,8 @@ window.updateLobbyList = (players) => {
             }
         } else {
             // Для чужих просто пишем команду
-            const color = p.team === 1 ? '#63db44' : '#d43333';
-            const label = p.team === 1 ? 'GREEN' : 'RED';
+            const color = p.team === 1 ? '#e6c629' : '#63db44';
+            const label = p.team === 1 ? 'YELLOW' : 'GREEN';
             actionsHtml = `<span class="team-label" style="color: ${color}; font-weight: bold;">${label}</span>`;
         }
         
