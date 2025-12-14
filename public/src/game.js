@@ -33,12 +33,13 @@ let serverState = {
     map: null,
     bases: [],
     bonus: null,
+    winnerTeamId: null,
     isGameOver: false
 };
 
 window.tankGame = {
-    createRoom: (localCount) => {
-        socket.emit('create_room', { localCount });
+    createRoom: (localCount, nicknames) => {
+        socket.emit('create_room', { localCount, nicknames });
     },
     joinRoom: (roomId, localCount) => {
         socket.emit('join_room', { roomId, localCount });
@@ -49,8 +50,8 @@ window.tankGame = {
     changeTeam: (localIndex, teamId) => {
         socket.emit('change_team', { localIndex, teamId });
     },
-    quickPlay: (localCount) => {
-        socket.emit('quick_play', { localCount });
+    quickPlay: (localCount, nicknames) => {
+        socket.emit('quick_play', { localCount, nicknames});
     },
     changeName: (localIndex, name) => {
         socket.emit('change_nickname', { localIndex, name });
@@ -146,6 +147,7 @@ socket.on('state', (state) => {
     serverState.bases = state.bases;
     serverState.isPaused = state.isPaused;
     serverState.isGameOver = state.isGameOver;
+    serverState.winnerTeamId = state.winnerTeamId;
     serverState.pendingSpawns = state.pendingSpawns;
 
     if (state.map) serverState.map = state.map;
@@ -319,7 +321,6 @@ function draw() {
     drawMapLayers(ctx, game.sprites, serverState.map, Date.now()); 
     drawBases(ctx, game.sprites, serverState.bases); 
     
-    drawBonus(ctx, game.sprites, serverState.bonus); 
 
     drawBullets(ctx, game.sprites, serverState.bullets);
     drawEnemies(ctx, game.sprites, serverState.enemies, serverState.pendingSpawns);
@@ -327,6 +328,8 @@ function draw() {
     drawExplosions(ctx, game.sprites);
 
     if (typeof drawForest === 'function') drawForest(ctx, game.sprites, serverState.map); 
+
+    drawBonus(ctx, game.sprites, serverState.bonus); 
 
     ctx.restore();
 
@@ -336,13 +339,31 @@ function draw() {
 
     // 4. UI Game Over
     if (serverState.isGameOver) {
+
+        let msg = "GAME OVER";
+        let color = "red";
+        let myTeam = 0;
+        
+        const me = Object.values(serverState.players).find(p => p.socketId === socket.id);
+        if (me) myTeam = me.team;
+        
+        if (serverState.winnerTeamId) {
+            if (serverState.winnerTeamId === myTeam) {
+                msg = "VICTORY!";
+                color = "gold";
+            } else {
+                msg = "DEFEAT";
+                color = "red";
+            }
+        }
+
         ctx.save();
         ctx.translate(PADDING, PADDING); // Чтобы координаты совпадали с полем
-        ctx.fillStyle = 'red';
+        ctx.fillStyle = color;
         ctx.font = 'bold 20px Courier New';
         ctx.textAlign = 'center';
         // Центр ПОЛЯ, а не экрана
-        ctx.fillText("GAME OVER", MAP_WIDTH / 2, MAP_HEIGHT / 2);
+        ctx.fillText(msg, MAP_WIDTH / 2, MAP_HEIGHT / 2);
         ctx.restore();
     }
 

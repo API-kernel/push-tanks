@@ -97,6 +97,7 @@ io.on('connection', (socket) => {
     // 3. Quick Play (Матчмейкинг)
     socket.on('quick_play', (config) => {
         const localCount = config.localCount || 1;
+        const nicknames = config.nicknames || [];
         let targetRoomId = null;
         
         for (const id in rooms) {
@@ -116,10 +117,10 @@ io.on('connection', (socket) => {
         
         if (targetRoomId) {
             // Нашли существующую -> Входим
-            joinRoomLogic(socket, targetRoomId, localCount, false);
+            joinRoomLogic(socket, targetRoomId, localCount, false, nicknames);
         } else {
             // Не нашли -> Создаем новую И СРАЗУ ЗАПУСКАЕМ (true)
-            createRoomLogic(socket, localCount, true);
+            createRoomLogic(socket, localCount, true, nicknames);
         }
     });
 
@@ -147,13 +148,13 @@ io.on('connection', (socket) => {
         }
     }
 
-    function createRoomLogic(socket, localCount, autoStart = false) {
+    function createRoomLogic(socket, localCount, autoStart = false, nicknames = []) {
         const roomId = generateRoomId();
-        const room = new GameRoom(roomId, io);
+        const room = new GameRoom(roomId, io, availableMaps);
         room.hostSocketId = socket.id;
         rooms[roomId] = room;
         
-        joinRoomLogic(socket, roomId, localCount, true); // true = isHost
+        joinRoomLogic(socket, roomId, localCount, true, nicknames); // true = isHost
         
         if (autoStart) {
             room.startGame();

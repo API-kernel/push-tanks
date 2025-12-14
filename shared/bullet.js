@@ -1,17 +1,17 @@
-import { TILE_SIZE } from './config.js';
+import { TILE_SIZE, TILE_BIG_SIZE } from './config.js';
 
 export const bullets = [];
 
 export function createBullet(shooter, bulletsList, map) {
-    let x = shooter.x + TILE_SIZE / 2;
-    let y = shooter.y + TILE_SIZE / 2;
+    let x = shooter.x + TILE_BIG_SIZE / 2;
+    let y = shooter.y + TILE_BIG_SIZE / 2;
 
     if (shooter.direction === 'UP') { y -= 8; x -= 2; }
     else if (shooter.direction === 'DOWN') { y += 8; x -= 2; }
     else if (shooter.direction === 'LEFT') { x -= 8; y -= 2; }
     else if (shooter.direction === 'RIGHT') { x += 8; y -= 2; }
 
-    const speed = (shooter.level >= 2) ? 5 : 3;
+    const speed = (shooter.level >= 2) ? 4 : 2;
 
     const b = {
         x, y, 
@@ -27,7 +27,7 @@ export function createBullet(shooter, bulletsList, map) {
     bulletsList.push(b);
 }
 
-export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
+export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager) {
     const events = [];
 
     for (let i = bulletsList.length - 1; i >= 0; i--) {
@@ -45,7 +45,7 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight) {
 
         for (let s = 0; s < steps; s++) {
             // Проверка перед шагом
-            let collisionResult = checkCollisionAndDestroy(b, map);
+            let collisionResult = checkCollisionAndDestroy(b, map, teamManager);
             if (collisionResult) {
                 events.push({ 
                     type: 'HIT', 
@@ -76,7 +76,7 @@ function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
-function checkCollisionAndDestroy(bullet, map) {
+function checkCollisionAndDestroy(bullet, map, teamManager) {
     if (bullet.isDead) return false;
 
     let hitDetected = false;
@@ -132,17 +132,13 @@ function checkCollisionAndDestroy(bullet, map) {
     if (bullet.ownerId >= 1000) {
         const bRow = Math.floor(bullet.y / TILE_SIZE);
         const bCol = Math.floor(bullet.x / TILE_SIZE);
-        // Координаты защиты базы для карты 26x26
-        if (bullet.team === 2 && bRow <= 3 && bCol >= 10 && bCol <= 15) {
-            bullet.isDead = true; 
-            return 'FRIENDLY_WALL'; 
-        }
-        if (bullet.team === 1 && bRow >= 22 && bCol >= 10 && bCol <= 15) {
+        
+        // Спрашиваем у менеджера: это моя база?
+        if (teamManager.isInBaseZone(bullet.team, bRow, bCol)) {
             bullet.isDead = true;
             return 'FRIENDLY_WALL'; 
         }
     }
-
     bullet.isDead = true;
     if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL_NO_DMG';
 

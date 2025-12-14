@@ -24,11 +24,13 @@ export const SPRITES = {
     bot_yellow_basic: getTankFrames(4, 0),
     bot_yellow_fast:  getTankFrames(5, 0),
     bot_yellow_armor: getTankFrames(6, 0),
+    bot_yellow_heavy: getTankFrames(7, 0),
 
     // ЗЕЛЕНЫЕ БОТЫ (Team 2) - Ряды 12-15
     bot_green_basic: getTankFrames(12, 0),
     bot_green_fast:  getTankFrames(13, 0),
     bot_green_armor: getTankFrames(14, 0),
+    bot_green_heavy: getTankFrames(15, 0),
 
     // --- БОТЫ (Бонусные / Красные) ---
     // Они находятся справа (X+128, col 8)
@@ -36,11 +38,13 @@ export const SPRITES = {
     bot_yellow_basic_red: getTankFrames(12, 8),
     bot_yellow_fast_red:  getTankFrames(13, 8),
     bot_yellow_armor_red: getTankFrames(14, 8),
+    bot_yellow_heavy_red: getTankFrames(15, 8),
 
     // Для Зеленых (Rows 12-15, Cols 8-9)
     bot_green_basic_red: getTankFrames(12, 8),
     bot_green_fast_red:  getTankFrames(13, 8),
     bot_green_armor_red: getTankFrames(14, 8),
+    bot_green_heavy_red: getTankFrames(15, 8),
 
     bullet: {
         UP:    [323, 102, 3, 4],

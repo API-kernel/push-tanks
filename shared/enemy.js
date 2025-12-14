@@ -133,8 +133,8 @@ function spawnTankFromStar(room, star) {
     let template = ENEMY_TYPES[0];
     if (rand < 0.4) template = ENEMY_TYPES[0];      // Basic
     else if (rand < 0.6) template = ENEMY_TYPES[1]; // Fast
-    else if (rand < 0.8) template = ENEMY_TYPES[2]; // Heavy
-    else template = ENEMY_TYPES[3];                 // Armor
+    else if (rand < 0.8) template = ENEMY_TYPES[2]; // Armor
+    else template = ENEMY_TYPES[3];                 // Heavy
 
     const teamConfig = room.teamManager.getTeam(star.team);
     const startDir = teamConfig ? teamConfig.direction : 'DOWN';

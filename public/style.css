@@ -305,3 +305,20 @@ input {
     outline: none;
     border-color: #63db44;
 }
+
+/* Крестик в углу */
+.lobby-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 40px;
+    color: #d43333;
+    cursor: pointer;
+    line-height: 1;
+    transition: transform 0.2s;
+}
+
+.lobby-close:hover {
+    transform: scale(1.2) rotate(90deg);
+    color: red;
+}

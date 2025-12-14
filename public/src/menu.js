@@ -20,12 +20,16 @@ window.changeSettings = () => {
     const botsGreen = parseInt(document.getElementById('opt-bots-green').value);
     const botsRed = parseInt(document.getElementById('opt-bots-red').value);
     const hotjoin = document.getElementById('opt-hotjoin').checked;
+    const bases = document.getElementById('opt-bases').checked;
+    const autonext = document.getElementById('opt-autonext').checked;
 
     if (window.tankGame) {
         window.tankGame.updateSettings({ 
             level, 
             startLives: lives, 
             maxActiveEnemies: maxActive,
+            basesEnabled: bases,
+            autoNextLevel: autonext,
             botsReserve: { 1: botsGreen, 2: botsRed }, // Передаем объект
             allowHotJoin: hotjoin 
         });
@@ -47,7 +51,12 @@ window.updateMapSelector = (list) => {
     });
 };
 
+window.backToMenu = () => {
+    location.reload(); 
+};
+
 window.changeName = (localIndex, val) => {
+    localStorage.setItem(`tank_nick_p${localIndex+1}`, val); 
     if (window.tankGame) window.tankGame.changeName(localIndex, val);
 };
 
@@ -58,37 +67,6 @@ window.selectLocalPlayers = (n) => {
     
     // Показываем второе поле
     document.getElementById('nick-p2').style.display = (n === 2) ? 'inline-block' : 'none';
-};
-
-window.updateLobbyUI = (data) => {
-    // data = { players, settings }
-    
-    // 1. Обновляем список игроков (старая функция)
-    updateLobbyList(data.players);
-
-    // 2. Обновляем Настройки
-    if (data.settings) {
-
-        const lvlSelect = document.getElementById('opt-level-select');
-        if (lvlSelect) {
-            lvlSelect.value = data.settings.level;
-            if (!isMyHost) lvlSelect.disabled = true;
-            else lvlSelect.disabled = false;
-        }
-
-        const lvlInput = document.getElementById('opt-level');
-
-        // Если я НЕ хост, я обновляю свои инпуты значениями с сервера
-        // Если я ХОСТ, я не обновляю, чтобы курсор не прыгал (хотя можно и обновить)
-        if (!isMyHost) {
-            lvlInput.value = data.settings.level;
-            
-            // Блокируем для не-хоста
-            lvlInput.disabled = true;
-        } else {
-            lvlInput.disabled = false;
-        }
-    }
 };
 
 window.updateLobbyList = (players) => {
@@ -124,7 +102,13 @@ window.updateLobbyList = (players) => {
         
         let nameHtml = '';
         if (isMe) {
-            let val = p.nickname || "";
+            
+            let val = p.nickname;
+            if (!val) {
+                 val = localStorage.getItem(`tank_nick_p${p.localIndex+1}`) || "";
+                 if (val) changeName(p.localIndex, val);
+            }
+
             if (activeId === inputId && activeEl) {
                 val = activeEl.value; // Оставляем локальное значение
             }
@@ -179,7 +163,9 @@ window.updateLobbyList = (players) => {
             el.focus();
             // Восстанавливаем курсор
             if (el.setSelectionRange) {
-                el.setSelectionRange(selectionStart, selectionEnd);
+                if (el.type === 'text' || el.type === 'password') {
+                    el.setSelectionRange(selectionStart, selectionEnd);
+                }
             }
         }
     }
@@ -199,7 +185,7 @@ function createRoom() {
     // Решение: game.js при старте повесит свои методы на window.tankGame
     if (window.tankGame) {
         window.tankGame.initAudio();
-        window.tankGame.createRoom(localPlayersCount);
+        window.tankGame.createRoom(localPlayersCount, getNicknames());
     }
 }
 
@@ -242,7 +228,7 @@ window.hideMenu = () => {
 function quickPlay() {
     if (window.tankGame) {
         window.tankGame.initAudio();
-        window.tankGame.quickPlay(localPlayersCount);
+        window.tankGame.quickPlay(localPlayersCount, getNicknames());
     }
 }
 
@@ -264,30 +250,38 @@ function changeSettings() {
     }
 }
 
+function getNicknames() {
+    const n1 = localStorage.getItem('tank_nick_p1') || "P1";
+    const n2 = localStorage.getItem('tank_nick_p2') || "P2";
+    return [n1, n2];
+}
+
 window.updateLobbyUI = (data) => {
     updateLobbyList(data.players);
 
     if (data.settings) {
-        const lvlInput = document.getElementById('opt-level-select');
-        const hotjoinInput = document.getElementById('opt-hotjoin'); // Новая галочка
-        const greenInput = document.getElementById('opt-bots-green');
-        const redInput = document.getElementById('opt-bots-red');
-
-        if (!isMyHost) {
-            lvlInput.value = data.settings.level;
-            hotjoinInput.checked = data.settings.allowHotJoin;
-            greenInput.value = data.settings.botsReserve[1] || 0;
-            redInput.value = data.settings.botsReserve[2] || 0;
-
-            lvlInput.disabled = true;
-            hotjoinInput.disabled = true;
-            greenInput.disabled = true;
-            redInput.disabled = true;
-        } else {
-            lvlInput.disabled = false;
-            hotjoinInput.disabled = false;
-            greenInput.disabled = false;
-            redInput.disabled = false;
+        const s = data.settings;
+        
+        const setVal = (id, val, isCheck) => {
+            const el = document.getElementById(id);
+            if (isCheck) el.checked = val;
+            else el.value = val;
+            
+            el.disabled = !isMyHost;
+        };
+        
+        const sel = document.getElementById('opt-level-select');
+        if (sel) {
+            sel.value = s.level;
+            sel.disabled = !isMyHost;
         }
+
+        setVal('opt-hotjoin', s.allowHotJoin, true);
+        setVal('opt-lives', s.startLives);
+        setVal('opt-max-active', s.maxActiveEnemies);
+        setVal('opt-bots-green', s.botsReserve[1]);
+        setVal('opt-bots-red', s.botsReserve[2]);
+        setVal('opt-bases', s.basesEnabled, true);
+        setVal('opt-autonext', s.autoNextLevel, true);
     }
 };

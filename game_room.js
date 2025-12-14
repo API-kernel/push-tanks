@@ -11,13 +11,14 @@ import { BattleSystem } from './battle_system.js';
 import fs from 'fs/promises';
 
 export class GameRoom {
-    constructor(roomId, io) {
+    constructor(roomId, io, mapList = []) {
         this.id = roomId;
         this.io = io;
-        
+        this.mapList = mapList;
+
         // --- СОСТОЯНИЕ (STATE) ---
         this.players = {}; 
-        this.map = createLevel();
+        this.map = null;
         this.enemies = [];
         this.bullets = [];
         this.pendingSpawns = [];
@@ -32,15 +33,15 @@ export class GameRoom {
         
         this.isPaused = false;
         this.isGameOver = false;
+        this.winnerTeamId = null;
         this.gameOverTimer = 0;
         this.botsSpawnedCount = { 1: 0, 2: 0 };
-
-        this.resetGame();
-
         this.isRunning = false;
 
         this.settings = {
             level: 1,
+            basesEnabled: true, 
+            autoNextLevel: false,
             allowHotJoin: true,
             friendlyFire: false,
             startLives: 2,
@@ -49,6 +50,9 @@ export class GameRoom {
         };
 
         this.battleSystem = new BattleSystem(this);
+
+        this.resetGame();
+
     }
 
     addPlayer(socketId, localIndex, nickname) {
@@ -106,11 +110,14 @@ export class GameRoom {
     }
 
     async startGame() {
-        if (this.isRunning) return;
+        if (this.isRunning && !this.isGameOver) return
+        
+        this.isGameOver = false; 
+        this.isLoadingNextLevel = false;
         
         // 1. Загрузка (ждем завершения)
-        const lvlName = this.settings.level; // "1"
-        await this.loadMap(lvlName); // Здесь this.map станет массивом
+        const lvlName = this.settings.level;
+        await this.loadMap(lvlName);
 
         if (!this.map) {
             console.error("Map not loaded!");
@@ -166,9 +173,14 @@ export class GameRoom {
         }
 
         if (this.isGameOver) {
+
             this.gameOverTimer++;
             if (this.gameOverTimer > 300) {
-                this.stopGameAndReturnToLobby()
+                if (this.settings.autoNextLevel) {
+                    this.goToNextLevel();
+                } else {
+                    this.stopGameAndReturnToLobby();
+                }
             }
 
             this.io.to(this.id).emit('state', {
@@ -180,9 +192,41 @@ export class GameRoom {
                 map: this.map,
                 bases: this.teamManager.getAllBases(),
                 isGameOver: this.isGameOver,
+                winnerTeamId: this.winnerTeamId,
                 bonus: this.activeBonus
             });
 
+            return;
+        }
+
+        // --- ЛОГИКА ПОБЕДЫ (Симметричная) ---
+        const teams = this.teamManager.getTeams();
+        
+        // Список ID живых команд
+        const aliveTeamIds = [];
+
+        teams.forEach(team => {
+            const teamId = team.id;
+            
+            // 1. Резерв
+            const reserve = (this.settings.botsReserve[teamId] || 0) - (this.botsSpawnedCount[teamId] || 0);
+            
+            // 2. Активные боты
+            const activeBots = this.enemies.filter(e => e.team === teamId).length + 
+                               this.pendingSpawns.filter(s => s.team === teamId).length;
+                               
+            // 3. Активные игроки (у которых lives >= 0)
+            const activePlayers = Object.values(this.players).filter(p => p.team === teamId && p.lives >= 0).length;
+
+            // Если есть хоть кто-то или есть резерв -> команда жива
+            if (reserve > 0 || activeBots > 0 || activePlayers > 0) {
+                aliveTeamIds.push(teamId);
+            }
+        });
+
+        if (aliveTeamIds.length <= 1) {
+            const winnerId = aliveTeamIds.length == 1 ? aliveTeamIds[0] : null;
+            this.handleVictory(winnerId);
             return;
         }
 
@@ -202,7 +246,7 @@ export class GameRoom {
         updateEnemies(this);
 
         // 3. ПУЛИ
-        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT);
+        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager);
         this.bulletEvents.push(...bEvents);
 
         // 4. КОЛЛИЗИИ
@@ -285,7 +329,14 @@ export class GameRoom {
             if (p.bulletCooldown === 0 && myBullets < maxBullets) {
                 createBullet(p, this.bullets, this.map);
                 this.bulletEvents.push({ type: 'PLAYER_FIRE', ownerId: p.id });
-                p.bulletCooldown = (p.level >= 2) ? 15 : 25; 
+
+                if (p.level == 1) {
+                    p.bulletCooldown = 20;
+                } else if (p.level <= 3) {
+                    p.bulletCooldown = 10;
+                } else {
+                    p.bulletCooldown = 5;
+                }
             }
         }
     }
@@ -353,18 +404,50 @@ export class GameRoom {
         return { x: col * TILE_SIZE, y };
     }
 
-    resetGame() {
-        this.map = createLevel(this.rawMapData);
+    handleVictory(winnerTeamId) {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+        this.winnerTeamId = winnerTeamId;
+        this.gameOverTimer = 0;
+    }
+
+        goToNextLevel() {
+        const currentStr = String(this.settings.level);
+        let nextLevel = this.settings.level;
+        
+        const idx = this.mapList.indexOf(currentStr);
+        if (idx !== -1) {
+            const nextIdx = (idx + 1) % this.mapList.length;
+            nextLevel = this.mapList[nextIdx];
+        } else if (this.mapList.length > 0) {
+            nextLevel = this.mapList[0];
+        } else {
+             const num = parseInt(this.settings.level);
+             if (!isNaN(num)) nextLevel = num + 1;
+        }
+
+        this.settings.level = nextLevel;
+        
+        this.io.to(this.id).emit('lobby_update', { settings: this.settings, players: this.players });
+
+        this.startGame();
+    }
+
+    resetGame() {        
         this.bullets = [];
         this.enemies = [];
         this.pendingSpawns = [];
         this.activeBonus = null;
+        this.winnerTeamId = null;
         this.isGameOver = false;
         this.gameOverTimer = 0;
         this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
         this.botsSpawnedCount = { 1: 0, 2: 0 };
-        this.teamManager = new TeamManager();
 
+        this.teamManager = new TeamManager();
+        this.teamManager.setBasesEnabled(this.settings.basesEnabled);
+        this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
+        
         for (const id in this.players) {
             const p = this.players[id];
             p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0;
@@ -372,6 +455,10 @@ export class GameRoom {
             p.level = 1;
             const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
             p.x = sp.x; p.y = sp.y;
+            
+            const teamConfig = this.teamManager.getTeam(p.team);
+            p.direction = teamConfig ? teamConfig.direction : 'UP';
+
             destroyBlockAt(this.map, p.x, p.y);
         }
     }
@@ -387,6 +474,7 @@ export class GameRoom {
             bases: this.teamManager.getAllBases(),
             isPaused: this.isPaused,
             isGameOver: this.isGameOver,
+            winnerTeamId: this.winnerTeamId,
             bonus: this.activeBonus,
             settings: this.settings
         });
@@ -405,12 +493,12 @@ export class GameRoom {
             const data = await fs.readFile(filePath, 'utf-8');
             this.rawMapData = JSON.parse(data);
             
-            this.map = createLevel(this.rawMapData);
+            this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
             console.log(`Map ${levelName} loaded`);
         } catch (e) {
             console.error(`Failed to load map ${levelName}`, e);
             this.rawMapData = Array(26).fill().map(() => Array(26).fill(0));
-            this.map = createLevel(this.rawMapData);
+            this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
         }
     }
 }

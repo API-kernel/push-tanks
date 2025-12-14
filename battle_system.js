@@ -37,7 +37,8 @@ export class BattleSystem {
                     teamManager.destroyBase(base.team);
                     
                     this.room.bulletEvents.push({ type: 'BASE_DESTROY', x: base.x, y: base.y });
-                    this.room.isGameOver = true;
+                    const winnerId = (base.team === 1) ? 2 : 1;
+                    this.room.handleVictory(winnerId);
                 }
             });
             if (b.isDead) return;

@@ -64,8 +64,16 @@ export function createRandomBonus(x, y) {
 // Проверяет, взял ли игрок бонус
 export function checkBonusCollection(player, bonus) {
     if (!bonus) return null;
-    if (checkRectOverlap(player, bonus)) {
+    const bonusRect = {
+        x: bonus.x + 5,
+        y: bonus.y + 5,
+        width: 10,
+        height: 10
+    };
+
+    if (checkRectOverlap(player, bonusRect)) {
         return bonus.type;
     }
+
     return null;
 }

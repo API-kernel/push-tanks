@@ -4,6 +4,8 @@ import { BASE_WALLS } from './config.js';
 export class TeamManager {
     constructor() {
         this.teams = {};
+        this.basesEnabled = true;
+
         TEAMS_CONFIG.forEach(cfg => {
             this.teams[cfg.id] = {
                 ...cfg, 
@@ -13,9 +15,16 @@ export class TeamManager {
                 },
                 spawnPixelY: cfg.spawnY * TILE_SIZE,
                 baseAlive: true,
-                spawnTimer: 0
+                spawnTimer: 0,
+                safeZone: cfg.direction === 'UP' 
+                    ? { rMin: 22, rMax: 25, cMin: 10, cMax: 15 }
+                    : { rMin: 0, rMax: 3, cMin: 10, cMax: 15 }
             };
         });
+    }
+    
+    setBasesEnabled(enabled) {
+        this.basesEnabled = enabled;
     }
 
     getTeam(teamId) { return this.teams[teamId]; }
@@ -23,6 +32,8 @@ export class TeamManager {
     getMaxUnits(teamId) { return this.teams[teamId] ? this.teams[teamId].maxUnits : 0; }
 
     getAllBases() {
+        if (!this.basesEnabled) return [];
+
         return Object.values(this.teams).map(t => ({
             team: t.id,
             x: t.basePos.x,
@@ -32,6 +43,16 @@ export class TeamManager {
             isDead: !t.baseAlive,
             name: t.name
         }));
+    }
+
+    isInBaseZone(teamId, r, c) {
+        if (!this.basesEnabled) return false;
+        
+        const team = this.teams[teamId];
+        if (!team) return false;
+        
+        const z = team.safeZone;
+        return (r >= z.rMin && r <= z.rMax && c >= z.cMin && c <= z.cMax);
     }
 
     destroyBase(teamId) {
