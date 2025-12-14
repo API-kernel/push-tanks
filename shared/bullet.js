@@ -95,8 +95,9 @@ function checkCollisionAndDestroy(bullet, map, teamManager) {
         for (let col = startCol; col <= endCol; col++) {
             if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
                 let block = map[row][col];
-                if (typeof block !== 'object' || block.mask === 0) continue; 
-
+                if (block.type !== 1 && block.type !== 2) continue;
+                if (block.mask === 0) continue;
+                
                 for (let r = 0; r < 2; r++) {
                     for (let c = 0; c < 2; c++) {
                         if ((block.mask & (1 << (r * 2 + c))) !== 0) {

@@ -3,7 +3,16 @@ import { BLOCK_FULL, BASE_WALLS, TEAMS_CONFIG, TILE_SIZE } from './config.js';
 export function createLevel(rawMapData, basesEnabled) {
     if (!rawMapData) return [];
 
-    const map = JSON.parse(JSON.stringify(rawMapData));
+    const map = [];
+
+    for (let r = 0; r < rawMapData.length; r++) {
+        const row = [];
+        for (let c = 0; c < rawMapData[r].length; c++) {
+            let val = rawMapData[r][c];
+            row.push({ type: val, mask: (val === 1 || val === 2) ? 15 : 0 });
+        }
+        map.push(row);
+    }
 
     if (basesEnabled) {
         TEAMS_CONFIG.forEach(team => {
@@ -21,22 +30,13 @@ export function createLevel(rawMapData, basesEnabled) {
 
             for (let r = startRow; r <= endRow; r++) {
                 for (let c = startCol; c <= endCol; c++) {
-                    if (map[r] && map[r][c] !== undefined) {
-                        map[r][c] = 0; 
+                    if (map[r] && map[r][c]) {
+                        map[r][c].type = 0;
+                        map[r][c].mask = 0;
                     }
                 }
             }
         });
-    }
-
-    // 2. Преобразование в объекты
-    for (let r = 0; r < map.length; r++) {
-        for (let c = 0; c < map[r].length; c++) {
-            const cell = map[r][c];
-            if (cell === 1 || cell === 2) {
-                map[r][c] = { type: cell, mask: BLOCK_FULL }; // 0xF
-            }
-        }
     }
 
     if (basesEnabled) {
@@ -44,8 +44,9 @@ export function createLevel(rawMapData, basesEnabled) {
             const walls = BASE_WALLS[team.id];
             if (walls) {
                 walls.forEach(w => {
-                    if (map[w.r] && map[w.r][w.c] !== undefined) {
-                        map[w.r][w.c] = { type: 1, mask: BLOCK_FULL };
+                    if (map[w.r] && map[w.r][w.c]) {
+                        map[w.r][w.c].type = 1;
+                        map[w.r][w.c].mask = BLOCK_FULL;
                     }
                 });
             }
@@ -63,7 +64,7 @@ export function createLevel(rawMapData, basesEnabled) {
             let rowHasConcrete = false;
             for (const c of checkCols) {
                 const cell = map[r][c];
-                if (typeof cell === 'object' && cell.type === 2 && cell.mask > 0) {
+                if (cell.type === 2 && cell.mask > 0) {
                     rowHasConcrete = true;
                     break; 
                 }
@@ -99,8 +100,10 @@ export function destroyBlockAt(map, x, y) {
     const clear = (r, c) => {
         if (r >= 0 && r < map.length && c >= 0 && c < map[0].length) {
             const cell = map[r][c];
-            //object: Это Стена (Кирпич 1, Бетон 2) — у них есть маска.
-            if (typeof cell === 'object' || cell === 4) map[r][c] = 0;
+            if (cell.type === 1 || cell.type === 2 || cell.type === 4) {
+                cell.type = 0;
+                cell.mask = 0;
+            }
         }
     };
     clear(row, col); clear(row, col2); clear(row2, col); clear(row2, col2);

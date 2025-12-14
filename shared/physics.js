@@ -28,12 +28,12 @@ export function canMoveTo(newX, newY, map) {
             if (row < 0 || row >= map.length || col < 0 || col >= map[0].length) continue;
 
             const cell = map[row][col];
-            if (cell === 0 || cell === 3 || cell === 5) continue;
+            if (cell.type === 0 || cell.type === 3 || cell.type === 5) continue;
 
             const blockX = col * TILE_SIZE;
             const blockY = row * TILE_SIZE;
 
-            if (typeof cell === 'object') {
+            if (cell.type === 1 || cell.type === 2) {
                 if (cell.mask === 0) continue;
                 // Проверяем 4 микро-блока (2x2)
                 for (let r = 0; r < 2; r++) {
@@ -48,7 +48,7 @@ export function canMoveTo(newX, newY, map) {
                         }
                     }
                 }
-            } else if (cell === 4) {
+            } else if (cell.type === 4) {
                 // Вода 8x8
                 const waterRect = { x: blockX, y: blockY, w: 8, h: 8 };
                 if (checkRectIntersection(tankRect, waterRect)) return false;

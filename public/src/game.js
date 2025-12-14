@@ -3,7 +3,7 @@ console.log("Загрузка game.js (CLIENT)...");
 import { InputHandler } from './input.js';
 import { drawHUD } from './ui.js';
 import { audio } from './audio.js';
-import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING } from '../shared/config.js'; 
+import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING, TILE_SIZE } from '../shared/config.js'; 
 import { drawMapLayers, drawForest, drawBullets, drawPlayerNames,
      drawEnemies, drawPlayers, drawExplosions, 
      drawBases, drawBonus, updateExplosions, createExplosion,
@@ -185,9 +185,13 @@ socket.on('state', (state) => {
     Object.values(state.players).forEach(p => {
         if (p.socketId === myId) {
             // ЛЕД
-            const col = Math.floor((p.x + 8) / 16);
-            const row = Math.floor((p.y + 8) / 16);
-            const isIce = state.map && state.map[row] && state.map[row][col] === 5;
+            const col = Math.floor((p.x + 8) / TILE_SIZE);
+            const row = Math.floor((p.y + 8) / TILE_SIZE);
+            const isIce = state.map && state.map[row] && state.map[row][col].type === 5;
+            
+            if(isIce){
+                console.log(isIce)
+            }
             
             const wasMoving = prevMoving[p.id] || false;
             

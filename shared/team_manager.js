@@ -1,5 +1,5 @@
 import { TILE_SIZE, SPAWN_COLUMNS, TEAMS_CONFIG } from './config.js';
-import { BASE_WALLS } from './config.js';
+import { BASE_WALLS, BLOCK_FULL } from './config.js';
 
 export class TeamManager {
     constructor() {
@@ -70,7 +70,7 @@ export class TeamManager {
             if (map[w.r] && map[w.r][w.c] !== undefined) {
                 map[w.r][w.c] = {
                     type: newType,
-                    mask: w.mask 
+                    mask: BLOCK_FULL
                 };
             }
         });

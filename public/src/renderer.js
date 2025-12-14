@@ -14,9 +14,10 @@ export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
         for (let col = 0; col < levelMap[row].length; col++) {
             const block = levelMap[row][col];
             
-            if (block === 3) continue; // Лес
+            if (block.type === 0) continue;
+            if (block.type === 3) continue;
 
-            if (typeof block === 'object') {
+            if (block.type === 1 || block.type === 2) {
                 const baseSprite = SPRITES.blocks[block.type]; 
                 if (!baseSprite) continue;
                 // Вычисляем смещение текстуры
@@ -44,23 +45,20 @@ export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
                         }
                     }
                 }
-            } else {
-                if (block === 4) { // Вода
-                    const frames = SPRITES.blocks[4]; 
-                    const [sx, sy] = frames[waterFrame];
-                    // Вода анимируется целиком 16x16, но мы рисуем кусочек 8x8
+            } else if (block.type === 4) { // Вода
+                const frames = SPRITES.blocks[4]; 
+                const [sx, sy] = frames[waterFrame];
+                // Вода анимируется целиком 16x16, но мы рисуем кусочек 8x8
+                const texOffX = (col % 2) * 8;
+                const texOffY = (row % 2) * 8;
+                ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
+            } else if (block.type === 5) {
+                const spriteCoords = SPRITES.blocks[block.type];
+                if (spriteCoords) {
+                    const [sx, sy] = spriteCoords;
                     const texOffX = (col % 2) * 8;
                     const texOffY = (row % 2) * 8;
                     ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
-                } 
-                else if (block !== 0) { // Лед, Лес (если бы рисовали)
-                    const spriteCoords = SPRITES.blocks[block];
-                    if (spriteCoords) {
-                        const [sx, sy] = spriteCoords;
-                        const texOffX = (col % 2) * 8;
-                        const texOffY = (row % 2) * 8;
-                        ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);
-                    }
                 }
             }
         }
@@ -69,11 +67,14 @@ export function drawMapLayers(ctx, spritesImage, levelMap, gameTime) {
 
 export function drawForest(ctx, spritesImage, levelMap) {
     if (!levelMap) return;
-    const [sx, sy] = SPRITES.blocks[3]; 
+    const forestSprite = SPRITES.blocks[3]; 
+    if (!forestSprite) return;
+    const [sx, sy] = forestSprite;
 
     for (let row = 0; row < levelMap.length; row++) {
         for (let col = 0; col < levelMap[row].length; col++) {
-            if (levelMap[row][col] === 3) {
+            const block = levelMap[row][col];
+            if (block.type === 3) {
                 const texOffX = (col % 2) * 8;
                 const texOffY = (row % 2) * 8;
                 ctx.drawImage(spritesImage, sx + texOffX, sy + texOffY, 8, 8, col * 8, row * 8, 8, 8);

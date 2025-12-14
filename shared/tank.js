@@ -7,7 +7,7 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
     const cy = Math.floor((tank.y + TILE_SIZE) / TILE_SIZE);
     // Проверка границ массива
     let isOnIce = false;
-    if (map && map[cy] && map[cy][cx] === 5) isOnIce = true;
+    if (map && map[cy] && map[cy][cx].type === 5) isOnIce = true;
 
     // ИНЕРЦИЯ
     if (!direction && isOnIce && tank.slideTimer > 0) {
