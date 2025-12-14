@@ -38,6 +38,8 @@ export class GameRoom {
         this.gameOverTimer = 0;
         this.botsSpawnedCount = { 1: 0, 2: 0 };
         this.isRunning = false;
+        this.mapDirty = true;
+        this.tickCount = 0;  
 
         this.settings = {
             level: 1,
@@ -91,6 +93,7 @@ export class GameRoom {
         };
         
         destroyBlockAt(this.map, this.players[uniqueId].x, this.players[uniqueId].y);
+        this.mapDirty = true;
     }
 
     removeLocalPlayer(socketId, localIndex) {
@@ -190,7 +193,7 @@ export class GameRoom {
                 pendingSpawns: this.pendingSpawns,
                 bullets: this.bullets,
                 events: [],
-                map: this.map,
+                map: this.mapDirty ? this.map : null,
                 bases: this.teamManager.getAllBases(),
                 isGameOver: this.isGameOver,
                 winnerTeamId: this.winnerTeamId,
@@ -198,6 +201,11 @@ export class GameRoom {
             });
 
             return;
+        }
+
+        // Периодическая синхронизация (раз в 1 секунду)
+        if (this.tickCount++ % 60 === 0) {
+            this.mapDirty = true;
         }
 
         // --- ЛОГИКА ПОБЕДЫ (Симметричная) ---
@@ -249,6 +257,9 @@ export class GameRoom {
         // 3. ПУЛИ
         const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager);
         this.bulletEvents.push(...bEvents);
+        if (bEvents.some(e => e.type === 'HIT')) {
+            this.mapDirty = true;
+        }
 
         // 4. КОЛЛИЗИИ
         this.battleSystem.update();
@@ -263,16 +274,19 @@ export class GameRoom {
                     const phase = Math.floor(this.effectTimers.shovel / 30) % 2;
                     const isSteel = (phase === 0);
                     this.teamManager.fortifyBase(this.effectTimers.shovelTeam, isSteel, this.map);
+                    this.mapDirty = true;
                 }
             }
             
             if (this.effectTimers.shovel === 0) {
                 this.teamManager.fortifyBase(this.effectTimers.shovelTeam, false, this.map);
+                this.mapDirty = true;
             }
         }
 
         // 5. ОТПРАВКА
         this.broadcastState();
+        this.mapDirty = false;
     }
 
     updatePlayer(p) {
@@ -451,7 +465,8 @@ export class GameRoom {
         this.teamManager = new TeamManager();
         this.teamManager.setBasesEnabled(this.settings.basesEnabled);
         this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
-        
+        this.mapDirty = true;
+
         for (const id in this.players) {
             const p = this.players[id];
             p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0;
@@ -474,7 +489,7 @@ export class GameRoom {
             pendingSpawns: this.pendingSpawns,
             bullets: this.bullets,
             events: this.bulletEvents,
-            map: this.map,
+            map: this.mapDirty ? this.map : null,
             bases: this.teamManager.getAllBases(),
             isPaused: this.isPaused,
             isGameOver: this.isGameOver,

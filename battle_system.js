@@ -34,6 +34,11 @@ export class BattleSystem {
                 if (base.isDead) return;
                 if (checkRectOverlap(b, base)) {
                     b.isDead = true;
+
+                    if (b.ownerId >= 1000 && b.team === base.team) {
+                         return; // Урон не наносим
+                    }
+
                     teamManager.destroyBase(base.team);
                     
                     this.room.bulletEvents.push({ type: 'BASE_DESTROY', x: base.x, y: base.y });
