@@ -9,7 +9,7 @@ export class InputHandler {
         ];
 
         window.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT') return; 
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; 
 
             this.keys[e.code] = true;
             

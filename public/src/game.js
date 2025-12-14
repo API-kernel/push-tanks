@@ -1,5 +1,6 @@
 console.log("Загрузка game.js (CLIENT)...");
 
+import { initChat } from './chat.js';
 import { InputHandler } from './input.js';
 import { drawHUD } from './ui.js';
 import { audio } from './audio.js';
@@ -135,6 +136,7 @@ socket.on('connect', () => {
     console.log("Connected:", socket.id);
     myId = socket.id;
     window.setMyId(socket.id);
+    initChat(socket);
 });
 
 const prevMoving = {};
@@ -187,8 +189,9 @@ socket.on('state', (state) => {
             // ЛЕД
             const col = Math.floor((p.x + 8) / TILE_SIZE);
             const row = Math.floor((p.y + 8) / TILE_SIZE);
-            const isIce = state.map && state.map[row] && state.map[row][col].type === 5;
-            
+            const cell = state.map && state.map[row] && state.map[row][col];
+            const isIce = cell && cell.type === 5;
+
             if(isIce){
                 console.log(isIce)
             }

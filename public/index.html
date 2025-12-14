@@ -9,6 +9,18 @@
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+    <div id="main-layout">
+    
+    <!-- ЧАТ (Слева) -->
+    <div id="chat-container">
+        <div id="chat-toggle-btn" onclick="toggleChatVis()">CHAT</div>
+        <div id="chat-window">
+            <div id="chat-messages"></div>
+            <textarea  type="text" id="chat-input" placeholder="Chat here..."  rows="1"></textarea>
+        </div>
+    </div>
+
+    <!-- ИГРА (Справа) -->
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
         <canvas id="uiCanvas"></canvas>
@@ -78,8 +90,6 @@
         </div>
     </div>
 
-    <!-- Скрипты -->
-    <!-- Сначала грузим menu.js (его создадим), потом game.js -->
     <script src="src/menu.js"></script>
     <script type="module" src="src/game.js"></script>
 </body>

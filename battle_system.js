@@ -66,6 +66,8 @@ export class BattleSystem {
                         if (tank.inputs) { 
                             // ЭТО ИГРОК
                             isDead = true; // Игрок умирает с 1 попадания
+                            const killer = this.getOwnerName(b.ownerId);
+                            this.room.sendSystemMessage(`${tank.nickname} killed by ${killer}`);
                         } else { 
                             // ЭТО БОТ
                             const idx = enemies.indexOf(tank);
@@ -102,5 +104,21 @@ export class BattleSystem {
                 }
             }
         });
+    }
+
+    getOwnerName(ownerId) {
+        // Игрок?
+        const player = this.room.players[ownerId]; // ownerId может быть socketId_idx (строка)
+        
+        if (player) return player.nickname || "Player";
+        
+        // Бот?
+        if (typeof ownerId === 'number' && ownerId >= 1000) {
+            return `Bot #${ownerId}`;
+        }
+        
+        if (this.room.players[ownerId]) return this.room.players[ownerId].nickname;
+        
+        return "Unknown";
     }
 }

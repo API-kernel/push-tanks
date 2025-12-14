@@ -24,10 +24,11 @@ export class GameRoom {
         this.pendingSpawns = [];
         this.activeBonus = null;
         this.bulletEvents = []; 
-        
+        this.chatHistory = [];
+
         this.teamManager = new TeamManager();
         this.teamSpawnTimers = {};
-        this.enemyIdCounter = 2000;
+        this.enemyIdCounter = 1000;
         
         this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
         
@@ -343,7 +344,8 @@ export class GameRoom {
 
     applyBonus(player, type) {
         this.bulletEvents.push({ type: 'BONUS_TAKEN' });
-        
+        this.sendSystemMessage(`${player.nickname || 'Player'} picked up ${type.toUpperCase()}`);
+
         switch(type) {
             case 'helmet': player.shieldTimer = HELMET_DURATION; break;
             case 'clock': 
@@ -409,9 +411,11 @@ export class GameRoom {
         this.isGameOver = true;
         this.winnerTeamId = winnerTeamId;
         this.gameOverTimer = 0;
+        const team = this.teamManager.getTeam(winnerTeamId);
+        this.sendSystemMessage(`${team.name} TEAM WINS!`);
     }
 
-        goToNextLevel() {
+    goToNextLevel() {
         const currentStr = String(this.settings.level);
         let nextLevel = this.settings.level;
         
@@ -484,6 +488,36 @@ export class GameRoom {
         if (this.interval) {
             clearInterval(this.interval);
         }
+    }
+
+    handleChat(socketId, text) {
+        // Ищем имя игрока (первого попавшегося на этом сокете, или P1)
+        const pId = Object.keys(this.players).find(id => this.players[id].socketId === socketId);
+        const player = this.players[pId];
+        
+        const name = player ? (player.nickname || "Player") : "Spectator";
+        const team = player ? player.team : 0;
+
+        const msg = {
+            type: 'player',
+            sender: name,
+            team: team,
+            text: text.substring(0, 50)
+        };
+        
+        this.pushMessage(msg);
+    }
+
+    sendSystemMessage(text) {
+        this.pushMessage({ type: 'system', text });
+    }
+
+    pushMessage(msg) {
+        this.chatHistory.push(msg);
+        if (this.chatHistory.length > 50) this.chatHistory.shift();
+        
+        // Шлем всем
+        this.io.to(this.id).emit('chat_update', msg);
     }
 
     async loadMap(levelName) {

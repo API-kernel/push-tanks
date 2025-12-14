@@ -53,6 +53,7 @@ window.updateMapSelector = (list) => {
 
 window.backToMenu = () => {
     location.reload(); 
+    document.getElementById('chat-container').style.display = 'none';
 };
 
 window.changeName = (localIndex, val) => {
@@ -214,6 +215,7 @@ window.showLobby = (roomId, isHost) => {
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-id').innerText = roomId;
+    document.getElementById('chat-container').style.display = 'flex';
     
     if (isHost) {
         document.getElementById('btn-start').style.display = 'block';

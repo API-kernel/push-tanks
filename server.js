@@ -258,6 +258,12 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('chat_message', (data) => {
+        if (currentRoomId && rooms[currentRoomId]) {
+            rooms[currentRoomId].handleChat(socket.id, data.text);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('Disconnected:', socket.id);
         if (currentRoomId && rooms[currentRoomId]) {

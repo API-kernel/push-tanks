@@ -321,3 +321,96 @@ input {
     transform: scale(1.2) rotate(90deg);
     color: red;
 }
+
+
+#main-layout {
+    /* Игра по центру */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+}
+
+#chat-container {
+    position: fixed; /* Поверх всего */
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 300px;
+    
+    background: rgba(0, 0, 0, 0.9);
+    border-right: 4px solid #444;
+    
+    transform: translateX(-100%); /* Спрятан влево */
+    transition: transform 0.3s ease-in-out;
+    
+    z-index: 200;
+    display: none; /* Скрыт до входа в лобби */
+}
+
+#chat-window {
+    flex: 1;
+    background: #111;
+    border: 4px solid #444;
+    display: flex;
+    flex-direction: column;
+}
+
+#chat-container.open {
+    transform: translateX(0); /* Выехал */
+}
+
+/* Ярлычок (Кнопка) */
+#chat-toggle-btn {
+    position: absolute;
+    right: -40px; /* Торчит справа от чата */
+    top: 50%;
+    width: 40px;
+    height: 80px;
+    
+    background: #444;
+    color: white;
+    cursor: pointer;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl; /* Текст вертикально */
+    text-orientation: upright;
+    
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+#chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+#chat-input {
+    background: #222;
+    border: none;
+    border-top: 2px solid #444;
+    color: white;
+    padding: 15px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 10px;
+    outline: none;
+    resize: none; /* Запрет ручного ресайза */
+    overflow: hidden; /* Скрываем скроллбар */
+    box-sizing: border-box; /* Важно! */
+    height: 45px; /* Начальная высота (примерно 15px pad + 10px text + 15px pad = ~45-50) */
+    max-height: 270px; /* Максимум (дальше скролл) */
+    line-height: 1.5;
+}
+
+/* Сообщения */
+.msg-system { color: #fca048; font-style: italic; }
+.msg-player-1 { color: #e6c629; } /* Yellow */
+.msg-player-2 { color: #63db44; } /* Green */
+.msg-text { color: #eee; }
