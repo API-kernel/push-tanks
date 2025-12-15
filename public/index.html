@@ -44,8 +44,11 @@
 
         <!-- ЛОББИ (Ожидание) -->
         <div id="lobby-screen" style="display: none;">
-            <div class="lobby-close" onclick="backToMenu()">×</div>
-            <h2>ROOM: <span id="display-room-id" style="color: #63db44;">???</span></h2>
+            <div class="lobby-header">
+                <h2>ROOM: <span id="display-room-id" style="color: #63db44;">???</span></h2>
+                <button class="copy-btn" onclick="copyLink(this)" title="Copy Invite Link">🔗</button>
+                <div class="lobby-close" onclick="backToMenu()">×</div>
+            </div>
             <!-- БЛОК НАСТРОЕК -->
             <div class="lobby-settings">
                 <label>

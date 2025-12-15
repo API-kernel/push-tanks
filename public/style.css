@@ -409,6 +409,37 @@ input {
     line-height: 1.5;
 }
 
+.lobby-header {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Отступ между текстом и кнопкой */
+    margin-bottom: 20px;
+}
+
+.copy-btn {
+    background: none;
+    border: none; /* Без рамки */
+    color: #666; /* Серый */
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0px;
+    transition: color 0.2s;
+}
+
+.copy-btn:hover {
+    background: transparent !important; /* Принудительно убираем фон */
+    color: #fff;       /* Иконка становится белой */
+    border-color: #666; /* Рамка остается серой (или transparent, если хочешь без рамки) */
+    transform: scale(1.2);
+}
+
+/* Состояние "Скопировано" */
+.copy-btn.copied {
+    color: #63db44;
+    background: transparent !important;
+    border-color: #63db44;
+}
+
 /* Сообщения */
 .msg-system { color: #fca048; font-style: italic; }
 .msg-player-1 { color: #e6c629; } /* Yellow */

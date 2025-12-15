@@ -70,6 +70,21 @@ window.selectLocalPlayers = (n) => {
     document.getElementById('nick-p2').style.display = (n === 2) ? 'inline-block' : 'none';
 };
 
+window.copyLink = (btnElement) => {
+    const url = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
+    navigator.clipboard.writeText(url).then(() => {
+        // Анимация успеха
+        const original = btnElement.innerHTML; // "🔗"
+        
+        btnElement.innerHTML = "✔"; // Галочка
+        btnElement.classList.add('copied'); // Зеленый стиль
+        
+        setTimeout(() => {
+            btnElement.innerHTML = original;
+            btnElement.classList.remove('copied');
+        }, 1500);
+    });
+};
 window.updateLobbyList = (players) => {
     // 1. Запоминаем фокус
     const activeEl = document.activeElement;
@@ -208,10 +223,13 @@ function startGame() {
     }
 }
 
+let currentRoomId = "";
 // Функции для управления экранами (вызываются из game.js)
 window.showLobby = (roomId, isHost) => {
     console.log("Show Lobby. Host:", isHost);
     isMyHost = isHost;
+    currentRoomId = roomId;
+    
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-id').innerText = roomId;
