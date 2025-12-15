@@ -9,87 +9,110 @@
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div id="main-layout">
-    
-    <!-- ЧАТ (Слева) -->
-    <div id="chat-container">
-        <div id="chat-toggle-btn" onclick="toggleChatVis()">CHAT</div>
-        <div id="chat-window">
-            <div id="chat-messages"></div>
-            <textarea  type="text" id="chat-input" placeholder="Chat here..."  rows="1"></textarea>
-        </div>
-    </div>
 
-    <!-- ИГРА (Справа) -->
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <canvas id="uiCanvas"></canvas>
-        <!-- МЕНЮ -->
-        <div id="menu-screen">
-            <h1 class="title">TANK 1990 <br><span style="font-size: 0.5em; color: #a42020;">ONLINE</span></h1>
 
-            <div class="menu-actions">
-                <button onclick="quickPlay()" style="border-color: #63db44; color: #63db44;">QUICK PLAY</button> 
-                <br><br>
-
-                <button onclick="createRoom()">CREATE ROOM</button>
-                <div class="join-row">
-                    <input type="text" id="room-code" placeholder="ROOM ID" maxlength="5">
-                    <button onclick="joinRoom()">JOIN</button>
+    <div id="main-layout" style="flex-direction: column;">
+        <div id="game-area" style="display: flex; gap: 20px;">
+                <!-- ЧАТ (Слева) -->
+            <div id="chat-container">
+                <div id="chat-toggle-btn" onclick="toggleChatVis()">CHAT</div>
+                <div id="chat-window">
+                    <div id="chat-messages"></div>
+                    <textarea  type="text" id="chat-input" placeholder="Chat here..."  rows="1"></textarea>
                 </div>
             </div>
 
-            <div id="status-msg"></div>
+            <!-- ИГРА (Справа) -->
+            <div id="game-container">
+                <canvas id="gameCanvas"></canvas>
+                <canvas id="uiCanvas"></canvas>
+                <!-- МЕНЮ -->
+                <div id="menu-screen">
+                    <h1 class="title">TANK 1990 <br><span style="font-size: 0.5em; color: #a42020;">ONLINE</span></h1>
+
+                    <div class="menu-actions">
+                        <button onclick="quickPlay()" style="border-color: #63db44; color: #63db44;">QUICK PLAY</button> 
+                        <br><br>
+
+                        <button onclick="createRoom()">CREATE ROOM</button>
+                        <div class="join-row">
+                            <input type="text" id="room-code" placeholder="ROOM ID" maxlength="5">
+                            <button onclick="joinRoom()">JOIN</button>
+                        </div>
+                    </div>
+
+                    <div id="status-msg"></div>
+                </div>
+
+                <!-- ЛОББИ (Ожидание) -->
+                <div id="lobby-screen" style="display: none;">
+                    <div class="lobby-header">
+                        <h2>ROOM: <span id="display-room-id" style="color: #63db44;">???</span></h2>
+                        <button class="copy-btn" onclick="copyLink(this)" title="Copy Invite Link">🔗</button>
+                        <div class="lobby-close" onclick="backToMenu()">×</div>
+                    </div>
+                    <!-- БЛОК НАСТРОЕК -->
+                    <div class="lobby-settings">
+                        <label>
+                            MAP:
+                            <select id="opt-level-select" onchange="changeSettings()" disabled>
+                                <option>Loading...</option>
+                            </select>
+                        </label>
+                        <label>
+                            PLAYER LIVES:
+                            <input type="number" id="opt-lives" min="0" max="100" value="" onchange="changeSettings()" disabled>
+                        </label>
+                        <label>
+                            MAX ACTIVE TANKS:
+                            <input type="number" id="opt-max-active" min="1" max="100" value="" onchange="changeSettings()" disabled>
+                        </label>
+                        <br>
+                        <label>
+                            YELLOW BOTS:
+                            <input type="number" id="opt-bots-green" min="0" max="50" value="" onchange="changeSettings()" disabled>
+                        </label>
+                        <label>
+                            GREEN BOTS:
+                            <input type="number" id="opt-bots-red" min="0" max="100" value="" onchange="changeSettings()" disabled>
+                        </label>
+                        <label>
+                            INCLUDE BASES
+                            <input type="checkbox" id="opt-bases" onchange="changeSettings()" disabled>
+                        </label>
+                        <label>
+                            AUTO NEXT LEVEL
+                            <input type="checkbox" id="opt-autonext" onchange="changeSettings()" disabled>
+                        </label>
+                        <label>
+                            ALLOW JOIN IN GAME
+                            <input type="checkbox" id="opt-hotjoin" onchange="changeSettings()" disabled>
+                        </label>
+                    </div>
+
+                    <div id="lobby-players"></div>
+                    <button id="btn-start" onclick="startGame()" style="display: none;">START GAME</button>
+                </div>
+            </div>
         </div>
 
-        <!-- ЛОББИ (Ожидание) -->
-        <div id="lobby-screen" style="display: none;">
-            <div class="lobby-header">
-                <h2>ROOM: <span id="display-room-id" style="color: #63db44;">???</span></h2>
-                <button class="copy-btn" onclick="copyLink(this)" title="Copy Invite Link">🔗</button>
-                <div class="lobby-close" onclick="backToMenu()">×</div>
+            <!-- ИНСТРУКЦИЯ -->
+        <div id="instructions">
+            <div class="instr-col">
+                <h3>PLAYER 1</h3>
+                <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> MOVE</p>
+                <p><span class="key wide">SPACE</span> FIRE</p>
             </div>
-            <!-- БЛОК НАСТРОЕК -->
-            <div class="lobby-settings">
-                <label>
-                    MAP:
-                    <select id="opt-level-select" onchange="changeSettings()" disabled>
-                        <option>Loading...</option>
-                    </select>
-                </label>
-                <label>
-                    PLAYER LIVES:
-                    <input type="number" id="opt-lives" min="0" max="100" value="" onchange="changeSettings()" disabled>
-                </label>
-                <label>
-                    MAX ACTIVE TANKS:
-                    <input type="number" id="opt-max-active" min="1" max="100" value="" onchange="changeSettings()" disabled>
-                </label>
-                <br>
-                <label>
-                    YELLOW BOTS:
-                    <input type="number" id="opt-bots-green" min="0" max="50" value="" onchange="changeSettings()" disabled>
-                </label>
-                <label>
-                    GREEN BOTS:
-                    <input type="number" id="opt-bots-red" min="0" max="100" value="" onchange="changeSettings()" disabled>
-                </label>
-                <label>
-                    INCLUDE BASES
-                    <input type="checkbox" id="opt-bases" onchange="changeSettings()" disabled>
-                </label>
-                <label>
-                    AUTO NEXT LEVEL
-                    <input type="checkbox" id="opt-autonext" onchange="changeSettings()" disabled>
-                </label>
-                <label>
-                    ALLOW JOIN IN GAME
-                    <input type="checkbox" id="opt-hotjoin" onchange="changeSettings()" disabled>
-                </label>
+            <div class="instr-col">
+                <h3>PLAYER 2</h3>
+                <p><span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span> MOVE</p>
+                <p><span class="key wide">ENTER</span> FIRE</p>
             </div>
-
-            <div id="lobby-players"></div>
-            <button id="btn-start" onclick="startGame()" style="display: none;">START GAME</button>
+            <div class="instr-col">
+                <h3>SYSTEM</h3>
+                <p><span class="key">TAB</span> NAMES</p>
+                <p><span class="key">P</span> PAUSE</p>
+            </div>
         </div>
     </div>
 

@@ -278,10 +278,8 @@ function loop() {
 }
 
 function update() {
-    const inputs = {};
-
     // P1: WASD / Space
-    inputs[0] = {
+    const keysWASD = {
         up: game.input.keys['KeyW'],
         down: game.input.keys['KeyS'],
         left: game.input.keys['KeyA'],
@@ -292,7 +290,7 @@ function update() {
     };
 
     // P2: Arrows / Enter
-    inputs[1] = {
+    const keysArrows = {
         up: game.input.keys['ArrowUp'],
         down: game.input.keys['ArrowDown'],
         left: game.input.keys['ArrowLeft'],
@@ -300,6 +298,28 @@ function update() {
         fire: game.input.keys['Enter'],
         cheat0: false // Чит только у P1
     };
+
+    const p2Id = `${myId}_1`;
+    const p2Exists = serverState.players && serverState.players[p2Id];
+
+    const inputs = {};
+
+    if (!p2Exists) {
+        // РЕЖИМ 1 ИГРОКА: Объединяем управление (ИЛИ / OR)
+        // Игрок 1 управляется и WASD, и Стрелками
+        inputs[0] = {
+            up: keysWASD.up || keysArrows.up,
+            down: keysWASD.down || keysArrows.down,
+            left: keysWASD.left || keysArrows.left,
+            right: keysWASD.right || keysArrows.right,
+            fire: keysWASD.fire || keysArrows.fire,
+            cheat0: keysWASD.cheat0
+        };
+    } else {
+        // РЕЖИМ 2 ИГРОКОВ: Раздельное управление
+        inputs[0] = keysWASD;   // P1
+        inputs[1] = keysArrows; // P2
+    }
 
     socket.emit('input', inputs);
     updateExplosions();
