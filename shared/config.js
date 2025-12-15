@@ -38,18 +38,18 @@ export const TEAMS_CONFIG = [
 
 
 export const TANK_STATS = {
-    basic:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'basic'},
-    fast:   { speed: 60 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'fast',},
-    armor:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'armor'},
-    heavy:  { speed: 35 / SERVER_FPS, hp: 4, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 40, spriteKey: 'heavy'},
+    basic:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, canBreakSteel: false, spriteKey: 'basic'},
+    fast:   { speed: 60 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, canBreakSteel: false, spriteKey: 'fast',},
+    armor:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 60, canBreakSteel: false, spriteKey: 'armor'},
+    heavy:  { speed: 35 / SERVER_FPS, hp: 4, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 40, canBreakSteel: false, spriteKey: 'heavy'},
 
     player: { 
         speed: 60 / SERVER_FPS, 
         hp: 1, 
         levels: {
-            1: { bulletSpeed: 120 / SERVER_FPS, bulletCount: 1, cooldown: 12 }, 
-            2: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 1, cooldown: 8 }, 
-            3: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: 8 },
+            1: { bulletSpeed: 120 / SERVER_FPS, bulletCount: 1, cooldown: 12, canBreakSteel: false }, 
+            2: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 1, cooldown: 8, canBreakSteel: false  }, 
+            3: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: 8, canBreakSteel: false  },
             4: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: 8, canBreakSteel: true }
         }
     }
@@ -97,3 +97,6 @@ export const BULLET_COOLDOWN_SLOW = 12;
 export const BULLET_COOLDOWN_FAST = 8;
 
 export const CHAT_HISTORY_LENGTH = 100;
+
+export const TANK_SNAP_GRID = 8;
+export const TANK_SNAP_TOLERANCE = 8;

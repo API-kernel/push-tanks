@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS } from './config.js';
+import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS, TANK_SNAP_GRID, TANK_SNAP_TOLERANCE } from './config.js';
 import { canMoveTo } from './physics.js';
 
 export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, onCheckCollision) {
@@ -64,29 +64,43 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
     tank.x = nextX;
     tank.y = nextY;
 
-    // --- GRID ASSIST (Выравнивание 4px) ---
-    const axis = (direction === 'UP' || direction === 'DOWN') ? 'x' : 'y';
-    const center = tank[axis] + TILE_SIZE / 2;
-    const snapSize = 4;
-    const nearestGrid = Math.round(center / snapSize) * snapSize;
-    const diff = nearestGrid - center;
-
-    if (Math.abs(diff) > 0 && Math.abs(diff) < 3) {
-        const snapX = (axis === 'x') ? nearestGrid - TILE_SIZE/2 : tank.x;
-        const snapY = (axis === 'y') ? nearestGrid - TILE_SIZE/2 : tank.y;
-        
-        if (canMoveTo(snapX, snapY, map) && !onCheckCollision(snapX, snapY, tank.x, tank.y, tank.id)) {
-            if (axis === 'x') tank.x += Math.sign(diff); 
-            else tank.y += Math.sign(diff);
-        }
-    }
-
     // Анимация
     tank.frameTimer++;
     const animThreshold = (tank.speed > 0.8) ? 4 : 8;
     if (tank.frameTimer > animThreshold) {
         tank.frameTimer = 0;
         tank.frameIndex = (tank.frameIndex === 0) ? 1 : 0;
+    }
+
+    // --- GRID ASSIST
+    const axis = (direction === 'UP' || direction === 'DOWN') ? 'x' : 'y';
+    
+    // Центр танка по оси выравнивания
+    const center = tank[axis] + TILE_BIG_SIZE / 2; 
+    
+    const nearestGrid = Math.round(center / TANK_SNAP_GRID) * TANK_SNAP_GRID;
+    const diff = nearestGrid - center;
+
+    // Если мы не на сетке, но близко к ней
+    if (Math.abs(diff) > 0 && Math.abs(diff) < TANK_SNAP_TOLERANCE) {
+        
+        // Пытаемся сдвинуться перпендикулярно движению
+        const snapX = (axis === 'x') ? tank.x + Math.sign(diff) : tank.x;
+        const snapY = (axis === 'y') ? tank.y + Math.sign(diff) : tank.y;
+        
+        // Проверяем, не врежемся ли мы при сдвиге
+        // (Используем ту же функцию canMoveTo и onCheckCollision, что и для основного движения)
+        const canShiftMap = canMoveTo(snapX, snapY, map);
+        const canShiftTank = !onCheckCollision(snapX, snapY, tank.x, tank.y, tank.id);
+        
+        if (canShiftMap && canShiftTank) {
+            // Двигаем танк к сетке
+            // Скорость выравнивания = 1 пиксель за кадр (или меньше, если diff < 1)
+            const shiftAmount = Math.sign(diff) * Math.min(Math.abs(diff), 1);
+            
+            if (axis === 'x') tank.x += shiftAmount; 
+            else tank.y += shiftAmount;
+        }
     }
 
     return true;
