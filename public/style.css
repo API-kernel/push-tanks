@@ -490,3 +490,81 @@ input {
 .key.wide {
     padding: 5px 15px;
 }
+
+
+
+/* По умолчанию мобильный UI скрыт */
+#mobile-ui {
+    display: none;
+}
+
+/* Стили для мобильного режима */
+body.mobile-mode {
+    background: #000;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden; /* Запрет скролла */
+}
+
+body.mobile-mode #chat-container,
+body.mobile-mode #instructions {
+    display: none !important; /* Скрываем лишнее */
+}
+
+body.mobile-mode #mobile-ui {
+    display: flex;
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    height: 150px;
+    z-index: 999;
+    pointer-events: none; /* Чтобы клики сквозь пустоту проходили, если надо */
+}
+
+/* Зоны управления (включаем pointer-events обратно) */
+#zone_joystick {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 150px;
+    height: 150px;
+    pointer-events: auto;
+    /* background: rgba(255, 255, 255, 0.1); Debug */
+}
+
+#btn_fire {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 0, 0, 0.5);
+    border: 4px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    color: white;
+    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+#btn_fire.pressed {
+    background: rgba(255, 0, 0, 0.8);
+    transform: scale(0.95);
+}
+
+#btn_fullscreen {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: 1px solid white;
+    pointer-events: auto;
+    z-index: 1000;
+    font-size: 24px;
+}

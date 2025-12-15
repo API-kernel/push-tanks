@@ -36,6 +36,8 @@ let serverState = {
     isGameOver: false
 };
 
+window.tankGameInput = game.input;
+
 window.tankGame = {
     createRoom: (localCount, nicknames) => {
         socket.emit('create_room', { localCount, nicknames });
