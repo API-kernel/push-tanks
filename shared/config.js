@@ -15,6 +15,7 @@ export const CANVAS_WIDTH = PADDING + MAP_WIDTH + HUD_WIDTH + 16;
 export const CANVAS_HEIGHT = MAP_HEIGHT + PADDING * 2;
 
 export const SPAWN_COLUMNS = [0, 8, 16, 24];
+export const ENABLE_CHEATS = false; 
 
 // Просто массив настроек.
 export const TEAMS_CONFIG = [

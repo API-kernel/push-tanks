@@ -6,7 +6,7 @@ import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH, SHIELD_DURATION, SPAWN_ANIMATION_DURATION } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
-import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS } from './shared/config.js';
+import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS, ENABLE_CHEATS } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
 import fs from 'fs/promises';
 
@@ -313,11 +313,13 @@ export class GameRoom {
             return;
         }
 
-        if (p.cheatCooldown > 0) p.cheatCooldown--;
-        if (p.inputs.cheat0 && p.cheatCooldown <= 0) {
-            this.activeBonus = spawnBonus(p.x, p.y - 32); 
-            if(this.activeBonus) this.bulletEvents.push({type: 'BONUS_SPAWN'});
-            p.cheatCooldown = SERVER_FPS / 2;
+        if (ENABLE_CHEATS) {
+            if (p.cheatCooldown > 0) p.cheatCooldown--;
+            if (p.inputs.cheat0 && p.cheatCooldown <= 0) {
+                this.activeBonus = spawnBonus(p.x, p.y - 32); 
+                if(this.activeBonus) this.bulletEvents.push({type: 'BONUS_SPAWN'});
+                p.cheatCooldown = SERVER_FPS / 2;
+            }
         }
 
         if (p.isSpawning) {
