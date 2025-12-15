@@ -36,16 +36,6 @@ export function initChat(socket) {
         }
     });
 
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && document.activeElement !== input) {
-            e.preventDefault();
-            input.focus();
-        }
-        if (e.key === 'Escape') {
-            input.blur();
-        }
-    });
-
     // 3. Прием сообщений
     socket.on('chat_update', (msg) => {
         // msg = { sender: "Nick", text: "Hello", type: "system"|"player", team: 1|2 }
