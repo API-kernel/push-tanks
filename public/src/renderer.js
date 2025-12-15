@@ -123,10 +123,11 @@ export function drawBullets(ctx, spritesImage, bullets) {
 
 export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
 
+    const spawnFrame = Math.floor(Date.now() / 100) % 4; // Тот же таймер
+
     if (pendingSpawns) {
         pendingSpawns.forEach(s => {
-            const idx = s.frameIndex || 0;
-            const frame = SPRITES.spawn_appear[idx];
+            const frame = SPRITES.spawn_appear[spawnFrame];
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
                 ctx.drawImage(spritesImage, sx, sy, sw, sh, s.x, s.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
@@ -168,17 +169,23 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
 
 export function drawPlayers(ctx, spritesImage, playersMap) {
     if (!playersMap) return;
+    const spawnFrame = Math.floor(Date.now() / 100) % 4;
+
     Object.values(playersMap).forEach(p => {
         if (p.isDead) return;
 
         if (p.isSpawning) {
-            // Анимация звездочки (берем таймер с сервера или локальный)
-            // Сервер шлет p.spawnAnimTimer (0..60)
-            const idx = Math.floor((p.spawnAnimTimer || 0) / 4) % 4;
-            const frame = SPRITES.spawn_appear[idx];
+            const frame = SPRITES.spawn_appear[spawnFrame];
+            
             if (frame) {
                 const [sx, sy, sw, sh] = frame;
-                ctx.drawImage(spritesImage, sx, sy, sw, sh, p.x, p.y, TILE_BIG_SIZE, TILE_BIG_SIZE);
+                ctx.drawImage(
+                    spritesImage, 
+                    sx, sy, sw, sh, 
+                    // Округляем координаты (если используем интерполяцию, иначе они уже круглые)
+                    Math.round(p.x), Math.round(p.y), 
+                    TILE_BIG_SIZE, TILE_BIG_SIZE // 16x16
+                );
             }
         } else {
             // Танк

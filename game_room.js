@@ -4,9 +4,9 @@ import { updateEnemies, hitEnemy } from './shared/enemy.js';
 import { updateTankMovement } from './shared/tank.js';
 import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
-import { MAP_WIDTH, MAP_HEIGHT, TANK_STATS, TILE_SIZE } from './shared/config.js';
+import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH, SHIELD_DURATION, SPAWN_ANIMATION_DURATION } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
-import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION } from './shared/config.js';
+import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
 import fs from 'fs/promises';
 
@@ -85,10 +85,13 @@ export class GameRoom {
             frameIndex: 0,
             frameTimer: 0,
             level: 1,
-            isDead: false, respawnTimer: 0,
-            isSpawning: true, spawnAnimTimer: 0,
-            shieldTimer: 180,
-            bulletCooldown: 0, cheatCooldown: 0,
+            isDead: false, 
+            respawnTimer: 0,
+            isSpawning: true, 
+            spawnAnimTimer: 0,
+            shieldTimer: SHIELD_DURATION,
+            bulletCooldown: 0, 
+            cheatCooldown: 0,
             inputs: { up: false, down: false, left: false, right: false, fire: false, cheat0: false }
         };
         
@@ -135,7 +138,7 @@ export class GameRoom {
         // Очищаем старый интервал на всякий случай
         if (this.interval) clearInterval(this.interval);
         
-        this.interval = setInterval(() => this.update(), 1000 / 60);
+        this.interval = setInterval(() => this.update(), 1000 / SERVER_FPS);
         
         this.io.to(this.id).emit('game_start');
         this.io.to(this.id).emit('map_init', this.map);
@@ -179,7 +182,7 @@ export class GameRoom {
         if (this.isGameOver) {
 
             this.gameOverTimer++;
-            if (this.gameOverTimer > 300) {
+            if (this.gameOverTimer > 5 * SERVER_FPS) {
                 if (this.settings.autoNextLevel) {
                     this.goToNextLevel();
                 } else {
@@ -204,7 +207,7 @@ export class GameRoom {
         }
 
         // Периодическая синхронизация (раз в 1 секунду)
-        if (this.tickCount++ % 60 === 0) {
+        if (this.tickCount++ % SERVER_FPS === 0) {
             this.mapDirty = true;
         }
 
@@ -268,10 +271,10 @@ export class GameRoom {
         if (this.effectTimers.shovel > 0) {
             this.effectTimers.shovel--;
             
-            if (this.effectTimers.shovel < 180) {
+            if (this.effectTimers.shovel < 3 * SERVER_FPS) {
                 // Мигаем каждые 30 кадров (0.5 сек)
-                if (this.effectTimers.shovel % 30 === 0) {
-                    const phase = Math.floor(this.effectTimers.shovel / 30) % 2;
+                if (this.effectTimers.shovel % (SERVER_FPS / 2) === 0) {
+                    const phase = Math.floor(this.effectTimers.shovel / SERVER_FPS / 2) % 2;
                     const isSteel = (phase === 0);
                     this.teamManager.fortifyBase(this.effectTimers.shovelTeam, isSteel, this.map);
                     this.mapDirty = true;
@@ -293,7 +296,10 @@ export class GameRoom {
         if (p.isDead) {
             p.respawnTimer--;
             if (p.respawnTimer <= 0 && p.lives >= 0) {
-                p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0; p.level = 1;
+                p.isDead = false;
+                p.isSpawning = true;
+                p.spawnAnimTimer = 0;
+                p.level = 1;
                 
                 const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
                 p.x = sp.x;
@@ -311,12 +317,15 @@ export class GameRoom {
         if (p.inputs.cheat0 && p.cheatCooldown <= 0) {
             this.activeBonus = spawnBonus(p.x, p.y - 32); 
             if(this.activeBonus) this.bulletEvents.push({type: 'BONUS_SPAWN'});
-            p.cheatCooldown = 30;
+            p.cheatCooldown = SERVER_FPS / 2;
         }
 
         if (p.isSpawning) {
             p.spawnAnimTimer++;
-            if (p.spawnAnimTimer > 60) { p.isSpawning = false; p.shieldTimer = 180; }
+            if (p.spawnAnimTimer > SPAWN_ANIMATION_DURATION) { 
+                p.isSpawning = false;
+                p.shieldTimer = SHIELD_DURATION; 
+            }
             return; 
         }
 
@@ -337,21 +346,24 @@ export class GameRoom {
 
         updateTankMovement(p, direction, MAP_WIDTH, MAP_HEIGHT, this.map, this.checkGlobalCollision.bind(this));
 
+        const stats = TANK_STATS.player.levels[p.level || 1];
         if (p.bulletCooldown > 0) p.bulletCooldown--;
         if (input.fire) {
             const myBullets = this.bullets.filter(b => b.ownerId === p.id && !b.isDead).length;
             const maxBullets = (p.level >= 3) ? 2 : 1; 
             if (p.bulletCooldown === 0 && myBullets < maxBullets) {
-                createBullet(p, this.bullets, this.map);
+                const bullet = createBullet(p, stats.bulletSpeed);
+                this.bullets.push(bullet);
                 this.bulletEvents.push({ type: 'PLAYER_FIRE', ownerId: p.id });
-
-                if (p.level == 1) {
-                    p.bulletCooldown = 20;
-                } else if (p.level <= 3) {
-                    p.bulletCooldown = 10;
-                } else {
-                    p.bulletCooldown = 5;
-                }
+                p.bulletCooldown = stats.cooldown;
+                
+                // if (p.level == 1) {
+                //     p.bulletCooldown = Math.round(SERVER_FPS / 2);
+                // } else if (p.level <= 3) {
+                //     p.bulletCooldown = Math.round(SERVER_FPS / 3);
+                // } else {
+                //     p.bulletCooldown = Math.round(SERVER_FPS / 5);
+                // }
             }
         }
     }
@@ -469,7 +481,9 @@ export class GameRoom {
 
         for (const id in this.players) {
             const p = this.players[id];
-            p.isDead = false; p.isSpawning = true; p.spawnAnimTimer = 0;
+            p.isDead = false;
+            p.isSpawning = true;
+            p.spawnAnimTimer = 0;
             p.lives = this.settings.startLives
             p.level = 1;
             const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
@@ -529,7 +543,7 @@ export class GameRoom {
 
     pushMessage(msg) {
         this.chatHistory.push(msg);
-        if (this.chatHistory.length > 50) this.chatHistory.shift();
+        if (this.chatHistory.length > CHAT_HISTORY_LENGTH) this.chatHistory.shift();
         
         // Шлем всем
         this.io.to(this.id).emit('chat_update', msg);

@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILE_BIG_SIZE } from './config.js';
+import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS } from './config.js';
 import { canMoveTo } from './physics.js';
 
 export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, onCheckCollision) {
@@ -14,7 +14,7 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
         direction = tank.lastDirection;
         tank.slideTimer--;
     } else if (direction) {
-        tank.slideTimer = 32; // Заряжаем инерцию
+        tank.slideTimer = 0.5 * SERVER_FPS; // Заряжаем инерцию
         tank.lastDirection = direction;
     } else {
         tank.slideTimer = 0;

@@ -1,16 +1,8 @@
-import { SPAWN_DELAY, TANK_STATS, MAP_WIDTH, MAP_HEIGHT } from './config.js';
+import { SPAWN_DELAY, TANK_STATS, MAP_WIDTH, MAP_HEIGHT, SERVER_FPS } from './config.js';
 import { createBullet } from './bullet.js';
 import { destroyBlockAt } from './level.js';
 import { updateTankMovement } from './tank.js';
 import { spawnBonus } from './bonus.js';
-
-
-const ENEMY_TYPES = [
-    { type: 'basic', spriteKey: 'basic', ...TANK_STATS.basic, bulletLvl: 1 },
-    { type: 'fast',  spriteKey: 'fast',  ...TANK_STATS.fast,  bulletLvl: 1 },
-    { type: 'armor', spriteKey: 'armor', ...TANK_STATS.armor, bulletLvl: 2 },
-    { type: 'heavy', spriteKey: 'heavy', ...TANK_STATS.heavy, bulletLvl: 2 },
-];
 
 export function hitEnemy(room, index) {
     const enemy = room.enemies[index];
@@ -81,12 +73,12 @@ export function updateEnemies(room) {
     for (let i = room.pendingSpawns.length - 1; i >= 0; i--) {
         const s = room.pendingSpawns[i];
         s.timer++;
-        if (s.timer % 4 === 0) {
+        if (s.timer % SERVER_FPS / 15 === 0) {
             s.frameIndex++;
-            if (s.frameIndex >= 4) s.frameIndex = 0;
+            if (s.frameIndex >= SERVER_FPS / 15) s.frameIndex = 0;
         }
 
-        if (s.timer > 60) { 
+        if (s.timer > SERVER_FPS) { 
             spawnTankFromStar(room, s);
             room.pendingSpawns.splice(i, 1);
         }
@@ -115,9 +107,11 @@ export function updateEnemies(room) {
         enemy.bulletTimer--;
         if (enemy.bulletTimer <= 0) {
             // Передаем список пуль комнаты и карту
-            createBullet(enemy, room.bullets, room.map);
+            const bullet = createBullet(enemy, enemy.bulletSpeed);
+            room.bullets.push(bullet);
             room.bulletEvents.push({ type: 'ENEMY_FIRE', x: enemy.x, y: enemy.y }); // Опционально звук
-            enemy.bulletTimer = 60 + Math.random() * 35;
+            const baseCD = enemy.bulletCooldownMax; 
+            enemy.bulletTimer = baseCD + Math.random() * (baseCD / 2); 
         }
     }
 }
@@ -130,12 +124,13 @@ function spawnTankFromStar(room, star) {
     destroyBlockAt(room.map, star.x, star.y);
 
     const rand = Math.random();
-    let template = ENEMY_TYPES[0];
-    if (rand < 0.4) template = ENEMY_TYPES[0];      // Basic
-    else if (rand < 0.6) template = ENEMY_TYPES[1]; // Fast
-    else if (rand < 0.8) template = ENEMY_TYPES[2]; // Armor
-    else template = ENEMY_TYPES[3];                 // Heavy
+    let type = 'basic';
+    if (rand < 0.4) type = 'basic';     
+    else if (rand < 0.6) type = 'fast'; 
+    else if (rand < 0.8) type = 'armor';
+    else type = 'heavy';     
 
+    const template = TANK_STATS[type]
     const teamConfig = room.teamManager.getTeam(star.team);
     const startDir = teamConfig ? teamConfig.direction : 'DOWN';
 
@@ -154,8 +149,10 @@ function spawnTankFromStar(room, star) {
         type: template.type,     
         spriteKey: template.spriteKey,
         bulletLvl: template.bulletLvl,
+        bulletSpeed: template.bulletSpeed,
+        bulletCooldownMax: template.bulletCooldown,
         isMoving: true,
-        bulletTimer: 60,
+        bulletTimer: SERVER_FPS,
         frameIndex: 0,
         frameTimer: 0,
         isBonus: isBonus

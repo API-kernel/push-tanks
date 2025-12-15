@@ -1,3 +1,5 @@
+export const SERVER_FPS = 60;
+
 export const TILE_SIZE = 8;
 export const TILE_BIG_SIZE = 16;
 
@@ -11,10 +13,6 @@ export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
 
 export const CANVAS_WIDTH = PADDING + MAP_WIDTH + HUD_WIDTH + 16; 
 export const CANVAS_HEIGHT = MAP_HEIGHT + PADDING * 2;
-
-export const SPAWN_DELAY = 120; 
-export const SPAWN_ANIMATION_DURATION = 60; 
-export const SHIELD_DURATION = 180; 
 
 export const SPAWN_COLUMNS = [0, 8, 16, 24];
 
@@ -38,12 +36,23 @@ export const TEAMS_CONFIG = [
     }
 ];
 
+
 export const TANK_STATS = {
-    player: { speed: 1.0, hp: 1, bulletSpeed: 3, bulletSpeedFast: 5 },
-    basic:  { speed: 0.6, hp: 1, bulletSpeed: 3 },
-    fast:   { speed: 1.2, hp: 1, bulletSpeed: 3 },
-    armor:  { speed: 0.6, hp: 1, bulletSpeed: 5 },
-    heavy:  { speed: 0.5, hp: 4, bulletSpeed: 5 },
+    basic:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'basic'},
+    fast:   { speed: 60 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'fast',},
+    armor:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 60, spriteKey: 'armor'},
+    heavy:  { speed: 35 / SERVER_FPS, hp: 4, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: 40, spriteKey: 'heavy'},
+
+    player: { 
+        speed: 60 / SERVER_FPS, 
+        hp: 1, 
+        levels: {
+            1: { bulletSpeed: 120 / SERVER_FPS, bulletCount: 1, cooldown: 12 }, 
+            2: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 1, cooldown: 8 }, 
+            3: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: 8 },
+            4: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: 8, canBreakSteel: true }
+        }
+    }
 };
 
 export const BONUS_WEIGHTS = {
@@ -55,10 +64,6 @@ export const BONUS_WEIGHTS = {
     'gun': 1,
     'shovel': 15
 };
-
-export const HELMET_DURATION = 300; 
-export const SHOVEL_DURATION = 1000;
-export const CLOCK_DURATION  = 600;
 
 export const BLOCK_FULL = 0xF; // 1111
 
@@ -77,3 +82,18 @@ export const BASE_WALLS = {
         {r:2,c:14}, {r:1,c:14}, {r:0,c:14}
     ]
 };
+
+export const SPAWN_DELAY = 2 * SERVER_FPS;
+export const SPAWN_ANIMATION_DURATION = 1 * SERVER_FPS; 
+export const RESPAWN_DELAY = 1.5 * SERVER_FPS; // 1 сек (быстрый респаун)
+
+// Эффекты
+export const SHIELD_DURATION = 3 * SERVER_FPS; // 3 сек
+export const HELMET_DURATION = 5 * SERVER_FPS; // 5 сек (бонус)
+export const CLOCK_DURATION  = 10 * SERVER_FPS; // 10 сек
+export const SHOVEL_DURATION = 15 * SERVER_FPS; // 15 сек
+
+export const BULLET_COOLDOWN_SLOW = 12;
+export const BULLET_COOLDOWN_FAST = 8;
+
+export const CHAT_HISTORY_LENGTH = 100;

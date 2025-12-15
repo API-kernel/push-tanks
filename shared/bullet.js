@@ -1,8 +1,6 @@
 import { TILE_SIZE, TILE_BIG_SIZE } from './config.js';
 
-export const bullets = [];
-
-export function createBullet(shooter, bulletsList, map) {
+export function createBullet(shooter, speed) {
     let x = shooter.x + TILE_BIG_SIZE / 2;
     let y = shooter.y + TILE_BIG_SIZE / 2;
 
@@ -11,9 +9,7 @@ export function createBullet(shooter, bulletsList, map) {
     else if (shooter.direction === 'LEFT') { x -= 8; y -= 2; }
     else if (shooter.direction === 'RIGHT') { x += 8; y -= 2; }
 
-    const speed = (shooter.level >= 2) ? 4 : 2;
-
-    const b = {
+    return {
         x, y, 
         direction: shooter.direction, 
         speed, 
@@ -23,8 +19,6 @@ export function createBullet(shooter, bulletsList, map) {
         ownerLevel: shooter.level || 1,
         width: 4, height: 4
     };
-
-    bulletsList.push(b);
 }
 
 export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager) {

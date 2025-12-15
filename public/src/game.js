@@ -1,5 +1,3 @@
-console.log("Загрузка game.js (CLIENT)...");
-
 import { initChat } from './chat.js';
 import { InputHandler } from './input.js';
 import { drawHUD } from './ui.js';

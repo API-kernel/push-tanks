@@ -1,5 +1,6 @@
 import { checkRectOverlap } from './shared/utils.js';
 import { hitEnemy } from './shared/enemy.js';
+import { RESPAWN_DELAY } from './shared/config.js';
 
 export class BattleSystem {
     constructor(room) {
@@ -91,7 +92,7 @@ export class BattleSystem {
                             if (tank.inputs) {
                                 tank.isDead = true;
                                 tank.lives--;
-                                tank.respawnTimer = 90; // 1.5 сек (как мы договорились)
+                                tank.respawnTimer = RESPAWN_DELAY; // 1.5 сек (как мы договорились)
                                 tank.x = -1000;
                             }
                             
