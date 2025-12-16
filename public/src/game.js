@@ -280,48 +280,15 @@ function loop() {
 }
 
 function update() {
-    // P1: WASD / Space
-    const keysWASD = {
-        up: game.input.keys['KeyW'],
-        down: game.input.keys['KeyS'],
-        left: game.input.keys['KeyA'],
-        pause: game.input.keys['KeyP'],
-        right: game.input.keys['KeyD'],
-        fire: game.input.keys['Space'],
-        cheat0: game.input.keys['Digit0']
-    };
-
-    // P2: Arrows / Enter
-    const keysArrows = {
-        up: game.input.keys['ArrowUp'],
-        down: game.input.keys['ArrowDown'],
-        left: game.input.keys['ArrowLeft'],
-        right: game.input.keys['ArrowRight'],
-        fire: game.input.keys['Enter'],
-        cheat0: false // Чит только у P1
-    };
-
     const p2Id = `${myId}_1`;
     const p2Exists = serverState.players && serverState.players[p2Id];
 
-    const inputs = {};
+    const inputs = game.input.getInputsPacket(!!p2Exists);
+    socket.emit('input', inputs);
 
-    if (!p2Exists) {
-        // РЕЖИМ 1 ИГРОКА: Объединяем управление (ИЛИ / OR)
-        // Игрок 1 управляется и WASD, и Стрелками
-        inputs[0] = {
-            up: keysWASD.up || keysArrows.up,
-            down: keysWASD.down || keysArrows.down,
-            left: keysWASD.left || keysArrows.left,
-            right: keysWASD.right || keysArrows.right,
-            fire: keysWASD.fire || keysArrows.fire,
-            cheat0: keysWASD.cheat0
-        };
-    } else {
-        // РЕЖИМ 2 ИГРОКОВ: Раздельное управление
-        inputs[0] = keysWASD;   // P1
-        inputs[1] = keysArrows; // P2
-    }
+    game.showNames = game.input.isShowNamesPressed() || (Date.now() - gameStartTime < 5000);
+
+    updateExplosions();
 
     socket.emit('input', inputs);
     updateExplosions();
@@ -411,10 +378,10 @@ function draw() {
         ctx.fillText(`ROOM: ${currentRoomId}`, canvas.width / 2, 20);
     }
     
-    const showNames = game.input.keys['Tab'] || (Date.now() - gameStartTime < 5000);
+
     let myTeam = 0;
     const me = Object.values(serverState.players).find(p => p.socketId === myId);
     if (me) myTeam = me.team;
 
-    drawPlayerNames(uiCtx, serverState.players, showNames, serverState.map, myTeam);
+    drawPlayerNames(uiCtx, serverState.players, game.showNames, serverState.map, myTeam);
 }
