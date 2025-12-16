@@ -11,6 +11,11 @@ window.changeTeam = (localIndex, teamId) => {
     if (window.tankGame) window.tankGame.changeTeam(localIndex, teamId);
 };
 
+window.toggleDonate = (show) => {
+    const modal = document.getElementById('donate-modal');
+    modal.style.display = show ? 'flex' : 'none';
+};
+
 window.changeSettings = () => {
     if (!isMyHost) return;
     const level = document.getElementById('opt-level-select').value;

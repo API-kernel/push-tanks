@@ -575,3 +575,137 @@ body.mobile-mode #mobile-ui {
     z-index: 1000;
     font-size: 24px;
 }
+
+
+
+/* Кнопка в меню */
+.donate-btn {
+    border-color: #fca048; /* Оранжевый */
+    color: #fca048;
+    font-size: 12px;
+    padding: 10px 20px;
+    animation: heartbeat 1.5s infinite;
+}
+
+@keyframes heartbeat {
+    0% { transform: scale(1); }
+    10% { transform: scale(1.1); }
+    20% { transform: scale(1); }
+    100% { transform: scale(1); }
+}
+
+/* Модальное окно (фон) */
+#donate-modal {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+}
+
+/* Окно */
+.modal-content {
+    background: #000;
+    border: 4px solid #fff;
+    width: 300px;
+    font-family: 'Press Start 2P', cursive;
+    color: white;
+    text-align: center;
+    box-shadow: 10px 10px 0 #222;
+}
+
+.modal-header {
+    background: #63db44; /* Зеленый заголовок */
+    color: black;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: black;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-body p {
+    font-size: 10px;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    color: #ccc;
+}
+
+.qr-placeholder {
+    width: 150px;
+    height: 150px;
+    background: white;
+    margin: 0 auto 20px auto;
+    padding: 5px; /* Белая рамка */
+}
+
+/* Ссылка-кнопка */
+.pay-link {
+    display: inline-block;
+    background: #fca048;
+    color: black;
+    text-decoration: none;
+    padding: 10px 20px;
+    border: 2px solid white;
+    font-size: 12px;
+}
+.pay-link:hover {
+    background: white;
+    color: #fca048;
+}
+
+
+
+
+.menu-footer {
+    margin-top: 60px; /* Отступ от кнопок */
+    font-size: 10px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.footer-link {
+    color: #888;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s;
+}
+
+.footer-link:hover {
+    color: white;
+    text-decoration: underline;
+}
+
+.footer-link .icon {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
+    opacity: 0.7;
+}
+
+.footer-link:hover .icon {
+    opacity: 1;
+}
+
+.separator {
+    color: #444;
+}

@@ -116,6 +116,49 @@
                 <p><span class="key">P</span> PAUSE</p>
             </div>
         </div>
+
+        <!-- КНОПКА ДОНАТА (внизу) -->
+        <div style="margin-top: 40px;">
+            <button class="donate-btn" onclick="toggleDonate(true)">❤️ SUPPORT DEV</button>
+        </div>
+
+          <!-- МОДАЛКА ДОНАТА -->
+        <div id="donate-modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>SERVER FUEL</span> <!-- Заголовок -->
+                    <button class="close-btn" onclick="toggleDonate(false)">×</button>
+                </div>
+                
+                <div class="modal-body">
+                    <p>
+                        DEV NEEDS COFFEE ☕<br>
+                        SERVER NEEDS POWER ⚡
+                    </p>
+                    
+                    <div class="qr-placeholder">
+                        <img src="assets/qr_code.png" alt="QR Code" style="width: 100%; image-rendering: pixelated;">
+                    </div>
+                    
+                    <p style="font-size: 8px; color: #888;">SCAN VIA BANK APP</p>
+
+                    <a href="https://www.tinkoff.ru/rm/r_rewtwjshrb.PATOkjKOCl/FSS4A72769" target="_blank" class="pay-link">
+                        SEND DONATE
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="menu-footer">
+            <a href="https://github.com/api-kernel" target="_blank" class="footer-link">
+                CODE
+            </a>
+            <span class="separator">|</span>
+            <a href="https://t.me/alx_pushkin" target="_blank" class="footer-link">
+                CONTACT
+            </a>
+        </div>
     </div>
 
     <!-- МОБИЛЬНОЕ УПРАВЛЕНИЕ (Скрыто на ПК через CSS) -->

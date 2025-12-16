@@ -22,13 +22,13 @@ def collect_js_files(
     if exclude_dirs is None:
         exclude_dirs = {
             "node_modules", ".git", ".vscode", "__pycache__",
-            "venv", ".env", "dist", "build", "coverage",
-            ".idea", ".vs", "out", "target", "bin", "obj"
+            ".venv", ".env", "dist", "build", "coverage",
+            ".idea", ".vs", "shared/maps", "tools", "bin", "obj"
         }
     
     if exclude_files is None:
         exclude_files = {
-            "package-lock.json", "yarn.lock", ".gitignore", "LICENSE"
+            "package-lock.json", "yarn.lock", ".gitignore", "package.json"
         }
     
     js_files = []
@@ -40,7 +40,7 @@ def collect_js_files(
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
         
         for file in files:
-            if file.lower().endswith('.js'):
+            if file.lower().endswith(('.js', '.html', '.css')):
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, project_path)
                 
