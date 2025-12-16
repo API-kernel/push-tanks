@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
     // 1. Создать комнату
     socket.on('create_room', (config) => {
         const roomId = generateRoomId();
-        const room = new GameRoom(roomId, io);
+        const room = new GameRoom(roomId, io, availableMaps);
         room.hostSocketId = socket.id;
         rooms[roomId] = room;
         
@@ -79,7 +79,7 @@ io.on('connection', (socket) => {
 
         if (!room) {
             console.log("Room not found, creating:", roomId);
-            room = new GameRoom(roomId, io);
+            room = new GameRoom(roomId, io, availableMaps);
             rooms[roomId] = room;
             joinRoomLogic(socket, roomId, data.localCount || 1, true, data.nicknames);
             return;
