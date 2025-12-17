@@ -37,6 +37,7 @@ export class GameRoom {
         this.winnerTeamId = null;
         this.gameOverTimer = 0;
         this.botsSpawnedCount = { 1: 0, 2: 0 };
+        this.teamWins = { 1: 0, 2: 0 };
         this.isRunning = false;
         this.mapDirty = true;
         this.tickCount = 0;  
@@ -198,6 +199,9 @@ export class GameRoom {
                 events: [],
                 map: this.mapDirty ? this.map : null,
                 bases: this.teamManager.getAllBases(),
+                settings: this.settings, 
+                botsSpawnedCount: this.botsSpawnedCount,
+                teamWins: this.teamWins,
                 isGameOver: this.isGameOver,
                 winnerTeamId: this.winnerTeamId,
                 bonus: this.activeBonus
@@ -436,11 +440,16 @@ export class GameRoom {
 
     handleVictory(winnerTeamId) {
         if (this.isGameOver) return;
+
         this.isGameOver = true;
         this.winnerTeamId = winnerTeamId;
         this.gameOverTimer = 0;
+        
+        if (winnerTeamId) this.teamWins[winnerTeamId]++;
+
         const team = this.teamManager.getTeam(winnerTeamId);
         this.sendSystemMessage(`${team.name} TEAM WINS!`);
+        console.log(`GAME OVER in room ${this.id}. Winner: Team ${winnerTeamId}`);
     }
 
     goToNextLevel() {
@@ -508,6 +517,9 @@ export class GameRoom {
             map: this.mapDirty ? this.map : null,
             bases: this.teamManager.getAllBases(),
             isPaused: this.isPaused,
+            settings: this.settings, 
+            botsSpawnedCount: this.botsSpawnedCount,
+            teamWins: this.teamWins,
             isGameOver: this.isGameOver,
             winnerTeamId: this.winnerTeamId,
             bonus: this.activeBonus,

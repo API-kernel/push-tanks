@@ -33,7 +33,10 @@ let serverState = {
     bases: [],
     bonus: null,
     winnerTeamId: null,
-    isGameOver: false
+    isGameOver: false,
+    settings: { level: 1, botsReserve: {1:20, 2:20} },
+    botsSpawnedCount: { 1: 0, 2: 0 },
+    teamWins: { 1: 0, 2: 0 } 
 };
 
 window.tankGameInput = game.input;
@@ -161,6 +164,8 @@ socket.on('state', (state) => {
     serverState.isGameOver = state.isGameOver;
     serverState.winnerTeamId = state.winnerTeamId;
     serverState.pendingSpawns = state.pendingSpawns;
+    serverState.players = state.players;
+    serverState.enemies = state.enemies;
 
     if (state.map) serverState.map = state.map;
 
@@ -173,6 +178,11 @@ socket.on('state', (state) => {
         audio.play('bonus_take');
         lastBonusId = null;
     }
+
+    if (state.settings) serverState.settings = state.settings;
+    if (state.botsSpawnedCount) serverState.botsSpawnedCount = state.botsSpawnedCount;
+    if (state.teamWins) serverState.teamWins = state.teamWins;
+
     serverState.bonus = state.bonus;
 
      // МОТОР
@@ -295,6 +305,8 @@ function update() {
 }
 
 function draw() {
+    const SCALE = 3; 
+    
     // 1. Фон
     ctx.fillStyle = '#636363';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -339,49 +351,102 @@ function draw() {
 
     // 3. HUD
     // Передаем массив игроков (преобразуем из объекта)
-    drawHUD(ctx, game.sprites, serverState.players);
+    let myTeam = 0;
+    const me = Object.values(serverState.players).find(p => p.socketId === myId);
+    if (me) myTeam = me.team;
+
+    const hudData = {
+        players: serverState.players,
+        enemies: serverState.enemies,
+        pendingSpawns: serverState.pendingSpawns,
+        settings: serverState.settings,
+        botsSpawnedCount: serverState.botsSpawnedCount,
+        myTeam: myTeam
+    };
+
+    drawHUD(ctx, game.sprites, hudData);
 
     // 4. UI Game Over
     if (serverState.isGameOver) {
 
         let msg = "GAME OVER";
-        let color = "red";
-        let myTeam = 0;
-        
-        const me = Object.values(serverState.players).find(p => p.socketId === socket.id);
-        if (me) myTeam = me.team;
+        let color = "#e52424"; // Красный
         
         if (serverState.winnerTeamId) {
             if (serverState.winnerTeamId === myTeam) {
                 msg = "VICTORY!";
-                color = "gold";
+                color = "#e6c629"; // Золотой (Желтый)
             } else {
                 msg = "DEFEAT";
-                color = "red";
+                color = "#e52424"; // Красный
             }
         }
 
-        ctx.save();
-        ctx.translate(PADDING, PADDING); // Чтобы координаты совпадали с полем
-        ctx.fillStyle = color;
-        ctx.font = 'bold 20px Courier New';
-        ctx.textAlign = 'center';
-        // Центр ПОЛЯ, а не экрана
-        ctx.fillText(msg, MAP_WIDTH / 2, MAP_HEIGHT / 2);
-        ctx.restore();
+        uiCtx.save();
+        // Используем пиксельный шрифт, крупный размер (так как разрешение x3)
+        uiCtx.font = 'bold 48px "Press Start 2P", monospace'; 
+        uiCtx.textAlign = 'center';
+        uiCtx.textBaseline = 'middle';
+
+        // Вычисляем центр ИГРОВОГО ПОЛЯ с учетом масштаба UI
+        // PADDING + Половина карты
+        const centerX = (PADDING + MAP_WIDTH / 2) * SCALE;
+        const centerY = (PADDING + MAP_HEIGHT / 2) * SCALE;
+
+        // 1. Черная обводка (чтобы текст читался на фоне кирпичей)
+        uiCtx.lineWidth = 8;
+        uiCtx.strokeStyle = 'black';
+        uiCtx.strokeText(msg, centerX, centerY);
+
+        // 2. Цветной текст
+        uiCtx.fillStyle = color;
+        uiCtx.fillText(msg, centerX, centerY);
+        
+        uiCtx.restore();
     }
 
-    if (!serverState.isGameOver) {
-        ctx.fillStyle = "black";
-        ctx.font = "8px \"Press Start 2P\""; // Или пиксельный
-        ctx.textAlign = "center";
-        ctx.fillText(`ROOM: ${currentRoomId}`, canvas.width / 2, 20);
-    }
+
+    uiCtx.save();
+    uiCtx.fillStyle = "black";
+    uiCtx.font = "bold 30px 'Press Start 2P', monospace"; // Крупный шрифт
+    uiCtx.textAlign = "center";
+    uiCtx.textBaseline = "top";
     
+    // Координаты: Середина экрана, отступ 10px сверху
+    const level = serverState.settings ? serverState.settings.level : 1;
+    uiCtx.fillText(`STAGE:${level}`.toUpperCase(), (canvas.width / 2) * SCALE, 10 * SCALE + 20);
+    uiCtx.restore();
 
-    let myTeam = 0;
-    const me = Object.values(serverState.players).find(p => p.socketId === myId);
-    if (me) myTeam = me.team;
+    // Б) СЧЕТ ПОБЕД (Справа внизу, поверх HUD зоны)    
+    const hudCenterX = (MAP_WIDTH + PADDING + 16) * SCALE;
+    
+    // Высота: Чуть выше нижней границы игрового поля (MAP_HEIGHT + PADDING)
+    const hudY = (MAP_HEIGHT + PADDING - 10) * SCALE; 
 
+    uiCtx.save();
+    // Шрифт поменьше (было 36)
+    uiCtx.font = 'bold 24px "Press Start 2P", monospace'; 
+    uiCtx.textBaseline = 'middle';
+    
+    const score1 = serverState.teamWins[1];
+    const score2 = serverState.teamWins[2];
+
+    // 1. Желтые (Слева)
+    uiCtx.textAlign = 'right';
+    uiCtx.fillStyle = '#E79C21'; 
+    uiCtx.fillText(score1, hudCenterX - 12, hudY);
+
+    // 2. Двоеточие (Центр)
+    uiCtx.textAlign = 'center';
+    uiCtx.fillStyle = 'black'; // Белый цвет для разделителя
+    uiCtx.fillText(":", hudCenterX, hudY); // Чуть выше визуально
+
+    // 3. Зеленые (Справа)
+    uiCtx.textAlign = 'left';
+    uiCtx.fillStyle = '#008C31'; 
+    uiCtx.fillText(score2, hudCenterX + 10, hudY);
+
+    uiCtx.restore();
+    
     drawPlayerNames(uiCtx, serverState.players, game.showNames, serverState.map, myTeam);
 }
