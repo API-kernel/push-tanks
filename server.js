@@ -120,7 +120,13 @@ io.on('connection', (socket) => {
             joinRoomLogic(socket, targetRoomId, localCount, false, nicknames);
         } else {
             // Не нашли -> Создаем новую И СРАЗУ ЗАПУСКАЕМ (true)
-            createRoomLogic(socket, localCount, true, nicknames);
+            let randomMap = '1'; // Фоллбэк на уровень 1, если карт нет
+            if (availableMaps.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableMaps.length);
+                randomMap = availableMaps[randomIndex];
+            }
+            
+            createRoomLogic(socket, localCount, true, nicknames, randomMap);
         }
     });
 
@@ -148,11 +154,15 @@ io.on('connection', (socket) => {
         }
     }
 
-    function createRoomLogic(socket, localCount, autoStart = false, nicknames = []) {
+    function createRoomLogic(socket, localCount, autoStart = false, nicknames = [], startLevel = null) {
         const roomId = generateRoomId();
         const room = new GameRoom(roomId, io, availableMaps);
         room.hostSocketId = socket.id;
         rooms[roomId] = room;
+
+        if (startLevel && availableMaps.includes(String(startLevel))) {
+            room.settings.level = startLevel;
+        }
         
         joinRoomLogic(socket, roomId, localCount, true, nicknames); // true = isHost
         
