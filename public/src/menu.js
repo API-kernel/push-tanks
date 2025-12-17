@@ -126,7 +126,7 @@ window.updateLobbyList = (players) => {
             
             let val = p.nickname;
             if (!val) {
-                 val = localStorage.getItem(`tank_nick_p${p.localIndex+1}`) || "";
+                 val = localStorage.getItem(`tank_nick_p${p.localIndex+1}`) || `P${p.localIndex+1}`;
                  if (val) changeName(p.localIndex, val);
             }
 
@@ -139,7 +139,7 @@ window.updateLobbyList = (players) => {
                 onchange="changeName(${p.localIndex}, this.value)" 
                 maxlength="10">`;
         } else {
-            nameHtml = `<span class="lobby-name-text" style="color:${p.team === 1 ? '#63db44' : '#d43333'}">${p.nickname || 'Unknown'}</span>`;
+            nameHtml = `<span class="lobby-name-text" style="color:${p.team === 1 ? '#e6c629' : '#63db44'}">${p.nickname || 'Unknown'}</span>`;
         }
 
         // 2. КОЛОНКА КНОПОК
