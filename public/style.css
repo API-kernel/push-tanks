@@ -568,14 +568,13 @@ body.mobile-mode #mobile-ui {
     position: fixed;
     top: 10px;
     right: 10px;
-    background: rgba(0,0,0,0.5);
+    background: transparent;
     color: white;
-    border: 1px solid white;
+    border: none;
     pointer-events: auto;
     z-index: 1000;
     font-size: 24px;
 }
-
 
 
 /* Кнопка в меню */
@@ -587,6 +586,16 @@ body.mobile-mode #mobile-ui {
     animation: heartbeat 1.5s infinite;
 }
 
+/* Скрываем кнопку доната в мобильном режиме */
+body.mobile-mode .donate-btn {
+    display: none !important;
+}
+
+/* Также можно скрыть футер (ссылки), если они мешают */
+body.mobile-mode .menu-footer {
+    display: none !important;
+}
+
 @keyframes heartbeat {
     0% { transform: scale(1); }
     10% { transform: scale(1.1); }
@@ -596,7 +605,7 @@ body.mobile-mode #mobile-ui {
 
 /* Модальное окно (фон) */
 #donate-modal {
-    position: absolute;
+    position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.8);
     display: flex;
@@ -708,4 +717,32 @@ body.mobile-mode #mobile-ui {
 
 .separator {
     color: #444;
+}
+
+#touch-toggle-btn {
+    position: fixed;
+    top: 10px;
+    left: 10px; /* Или left: 10px */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10000; /* Поверх всего */
+    user-select: none;
+    transition: transform 0.1s, text-shadow 0.2s;
+}
+
+#touch-toggle-btn:hover {
+    /* Легкое свечение */
+    text-shadow: 0 0 10px white;
+}
+
+#touch-toggle-btn:active {
+    /* Эффект нажатия */
+    transform: scale(0.9);
 }
