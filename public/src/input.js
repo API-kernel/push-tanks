@@ -15,6 +15,7 @@ export class InputHandler {
             
             if (gameKeys.includes(e.code)) {
                 e.preventDefault();
+                e.stopPropagation();
             }
         });
 

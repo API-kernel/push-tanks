@@ -170,14 +170,6 @@ socket.on('state', (state) => {
     if (state.map) serverState.map = state.map;
 
     // 2. Звук Бонуса
-    if (state.bonus && state.bonus.id !== lastBonusId) {
-        audio.play('bonus_appear');
-        lastBonusId = state.bonus.id;
-    }
-    if (!state.bonus && lastBonusId) {
-        audio.play('bonus_take');
-        lastBonusId = null;
-    }
 
     if (state.settings) serverState.settings = state.settings;
     if (state.botsSpawnedCount) serverState.botsSpawnedCount = state.botsSpawnedCount;

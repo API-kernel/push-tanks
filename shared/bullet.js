@@ -1,18 +1,39 @@
 import { TILE_SIZE, TILE_BIG_SIZE } from './config.js';
 
 export function createBullet(shooter, speed) {
-    let x = shooter.x + TILE_BIG_SIZE / 2;
-    let y = shooter.y + TILE_BIG_SIZE / 2;
+    // Центр тайла = 8. Визуальный центр танка ~7 (из-за отступов 1px и 2px).
+    // Сдвигаем точку спавна на -1.
+    const OFFSET = 1;
 
-    if (shooter.direction === 'UP') { y -= 8; x -= 2; }
-    else if (shooter.direction === 'DOWN') { y += 8; x -= 2; }
-    else if (shooter.direction === 'LEFT') { x -= 8; y -= 2; }
-    else if (shooter.direction === 'RIGHT') { x += 8; y -= 2; }
+    let x = shooter.x + TILE_BIG_SIZE / 2 - OFFSET; // 8 - 1 = 7
+    let y = shooter.y + TILE_BIG_SIZE / 2 - OFFSET; // 8 - 1 = 7
+
+    // Пуля 4x4. Её центр - это +2.
+    // Нам нужно, чтобы (x + 2) было ровно на дуле.
+    // Дуло находится по центру стороны.
+    
+    // Корректировка, чтобы пуля вылетала из края тайла
+    if (shooter.direction === 'UP') { 
+        y -= TILE_BIG_SIZE / 2; // Край
+        x -= OFFSET; // Центруем пулю (4px) относительно оси (7) -> 5. 
+        // Итог: x=5 (центр пули 7), y=-1.
+    }
+    else if (shooter.direction === 'DOWN') { 
+        y += TILE_BIG_SIZE / 2; 
+        x -= OFFSET; 
+    }
+    else if (shooter.direction === 'LEFT') { 
+        x -= TILE_BIG_SIZE / 2; 
+    }
+    else if (shooter.direction === 'RIGHT') { 
+        x += TILE_BIG_SIZE / 2; 
+    }
 
     return {
         x, y, 
         direction: shooter.direction, 
-        speed, 
+        speed,
+        dist: 0, 
         isDead: false,
         ownerId: shooter.id, 
         team: shooter.team,

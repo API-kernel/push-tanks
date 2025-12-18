@@ -1,8 +1,10 @@
+import { TILE_BIG_SIZE } from '../shared/config.js';
+
 export function checkRectOverlap(r1, r2) {
-    const r1w = r1.width || 16;
-    const r1h = r1.height || 16;
-    const r2w = r2.width || 16;
-    const r2h = r2.height || 16;
+    const r1w = r1.width || TILE_BIG_SIZE;
+    const r1h = r1.height || TILE_BIG_SIZE;
+    const r2w = r2.width || TILE_BIG_SIZE;
+    const r2h = r2.height || TILE_BIG_SIZE;
     
     return (r1.x < r2.x + r2w &&
             r1.x + r1w > r2.x &&
