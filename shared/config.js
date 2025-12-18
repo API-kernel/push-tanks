@@ -1,4 +1,4 @@
-export const SERVER_FPS = 60;
+export const SERVER_FPS = 30;
 
 export const TILE_SIZE = 8;
 export const TILE_BIG_SIZE = 16;
@@ -37,21 +37,26 @@ export const TEAMS_CONFIG = [
     }
 ];
 
+const TANK_SPEED_SLOW = 35;
+const TANK_SPEED_FAST = 60;
+
+const BULLET_SPEED_SLOW = 125;
+const BULLET_SPEED_FAST = 250;
 
 export const TANK_STATS = {
-    basic:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'basic'},
-    fast:   { speed: 60 / SERVER_FPS, hp: 1, bulletSpeed: 120 / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'fast',},
-    armor:  { speed: 35 / SERVER_FPS, hp: 1, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'armor'},
-    heavy:  { speed: 35 / SERVER_FPS, hp: 4, bulletSpeed: 180 / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'heavy'},
+    basic:  { speed: TANK_SPEED_SLOW / SERVER_FPS, hp: 1, bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'basic'},
+    fast:   { speed: TANK_SPEED_FAST / SERVER_FPS, hp: 1, bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'fast',},
+    armor:  { speed: TANK_SPEED_SLOW / SERVER_FPS, hp: 1, bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'armor'},
+    heavy:  { speed: TANK_SPEED_SLOW / SERVER_FPS, hp: 4, bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'heavy'},
 
     player: { 
-        speed: 60 / SERVER_FPS, 
+        speed: TANK_SPEED_FAST / SERVER_FPS, 
         hp: 1, 
         levels: {
-            1: { bulletSpeed: 120 / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.33 * SERVER_FPS), canBreakSteel: false }, 
-            2: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  }, 
-            3: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  },
-            4: { bulletSpeed: 180 / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: true }
+            1: { bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.33 * SERVER_FPS), canBreakSteel: false }, 
+            2: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  }, 
+            3: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  },
+            4: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: true }
         }
     }
 };
@@ -99,5 +104,5 @@ export const BULLET_COOLDOWN_FAST = 8;
 
 export const CHAT_HISTORY_LENGTH = 100;
 
-export const TANK_SNAP_GRID = 8;
-export const TANK_SNAP_TOLERANCE = 8;
+export const TANK_SNAP_GRID = 4;
+export const TANK_SNAP_TOLERANCE = 4;

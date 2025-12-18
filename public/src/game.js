@@ -227,15 +227,15 @@ socket.on('state', (state) => {
             const isMine = (typeof e.ownerId === 'string') && e.ownerId.startsWith(myId);
 
             if (e.type === 'WALL_HIT') {
-                createExplosion(e.x, e.y, EXPLOSION_SMALL);
+                createExplosion(e.x + 2, e.y + 2, EXPLOSION_SMALL);
                 if (isMine) audio.play('miss_hit');
             }
             else if (e.type === 'SHIELD_HIT') {
-                createExplosion(e.x, e.y, EXPLOSION_SMALL);
+                createExplosion(e.x + 2, e.y + 2, EXPLOSION_SMALL);
                 if (isMine) audio.play('brick_hit');
             }
             else if (e.type === 'HIT') {
-                createExplosion(e.x, e.y, EXPLOSION_SMALL);
+                createExplosion(e.x + 2, e.y + 2, EXPLOSION_SMALL);
                 if (isMine) {
                     if (e.isSteel) {
                         // Разрушил бетон?
@@ -248,17 +248,17 @@ socket.on('state', (state) => {
                 }
             }
             else if (e.type === 'TANK_EXPLODE') {
-                createExplosion(e.x, e.y, EXPLOSION_BIG);
+                createExplosion(e.x + 8, e.y + 8, EXPLOSION_BIG);
                 if (e.isPlayer) audio.play('explosion_player');
                 else audio.play('explosion_bot');
             }
             else if (e.type === 'BASE_DESTROY') {
-                createExplosion(e.x, e.y, EXPLOSION_BIG);
+                createExplosion(e.x + 8, e.y + 8, EXPLOSION_BIG);
                 audio.play('base_crash');
                 audio.play('game_over');
             }
             else if (e.type === 'ARMOR_HIT') {
-                createExplosion(e.x, e.y, EXPLOSION_SMALL);
+                createExplosion(e.x + 8, e.y + 8, EXPLOSION_SMALL);
                 audio.play('armor_hit');
             } 
             else if (e.type === 'PLAYER_FIRE') {

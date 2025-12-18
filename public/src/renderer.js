@@ -1,5 +1,5 @@
 import { SPRITES } from './sprites.js';
-import { TILE_SIZE, TILE_BIG_SIZE } from '../shared/config.js';
+import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS } from '../shared/config.js';
 import { drawRotated } from './client_utils.js';
 
 // --- КАРТА ---
@@ -290,7 +290,7 @@ export function createExplosion(x, y, type = EXPLOSION_SMALL) {
         x, y, type,
         frameIndex: 0,
         timer: 0,
-        animationSpeed: 4,
+        animationSpeed: 0.2 * SERVER_FPS,
         isDead: false
     });
 }

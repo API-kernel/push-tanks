@@ -103,5 +103,8 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
         }
     }
 
+    tank.x = Math.max(0, Math.min(tank.x, gameWidth - TILE_BIG_SIZE));
+    tank.y = Math.max(0, Math.min(tank.y, gameHeight - TILE_BIG_SIZE));
+
     return true;
 }
