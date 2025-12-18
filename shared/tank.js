@@ -64,14 +64,6 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
     tank.x = nextX;
     tank.y = nextY;
 
-    // Анимация
-    tank.frameTimer++;
-    const animThreshold = (tank.speed > 0.8) ? 4 : 8;
-    if (tank.frameTimer > animThreshold) {
-        tank.frameTimer = 0;
-        tank.frameIndex = (tank.frameIndex === 0) ? 1 : 0;
-    }
-
     // --- GRID ASSIST
     const axis = (direction === 'UP' || direction === 'DOWN') ? 'x' : 'y';
     

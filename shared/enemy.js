@@ -100,8 +100,6 @@ export function updateEnemies(room) {
         
         if (!moved) {
             if (Math.random() < 0.5) changeDirection(enemy);
-        } else {
-            enemy.frameTimer++; // Синхронизация анимации
         }
 
         enemy.bulletTimer--;
@@ -153,8 +151,6 @@ function spawnTankFromStar(room, star) {
         bulletCooldownMax: template.bulletCooldown,
         isMoving: true,
         bulletTimer: SERVER_FPS,
-        frameIndex: 0,
-        frameTimer: 0,
         isBonus: isBonus
     });
 }

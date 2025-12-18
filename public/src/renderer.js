@@ -1,6 +1,8 @@
 import { SPRITES } from './sprites.js';
-import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS } from '../shared/config.js';
+import { TILE_SIZE, TILE_BIG_SIZE } from '../shared/config.js';
 import { drawRotated } from './client_utils.js';
+
+const animCache = {}; // { id: { frame: 0, timer: 0 } }
 
 // --- КАРТА ---
 
@@ -151,7 +153,7 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
 
             const frames = SPRITES[key] || SPRITES[enemy.spriteKey];
             if (frames) {
-                const idx = enemy.frameIndex || 0;
+                const idx = getTankFrame(enemy.id, enemy.isMoving);
                 const frame = frames[idx];
                 if (frame) {
                     const [sx, sy, sw, sh] = frame;
@@ -195,7 +197,7 @@ export function drawPlayers(ctx, spritesImage, playersMap) {
 
             const frames = SPRITES[key] || SPRITES[`player_${color}_lvl1`];
             if (frames) {
-                const idx = p.frameIndex || 0;
+                const idx = getTankFrame(p.id, p.isMoving);
                 const frame = frames[idx];
                 if (frame) {
                     const [sx, sy, sw, sh] = frame;
@@ -290,7 +292,7 @@ export function createExplosion(x, y, type = EXPLOSION_SMALL) {
         x, y, type,
         frameIndex: 0,
         timer: 0,
-        animationSpeed: 0.2 * SERVER_FPS,
+        animationSpeed: 9,// Мы рендеримся через requestAnimationFrame (обычно 60 FPS).
         isDead: false
     });
 }
@@ -328,4 +330,24 @@ export function drawExplosions(ctx, spritesImage) {
             );
         }
     });
+}
+
+function getTankFrame(id, isMoving) {
+    if (!animCache[id]) {
+        animCache[id] = { frame: 0, timer: 0 };
+    }
+
+    const state = animCache[id];
+
+    if (isMoving) {
+        state.timer++;
+        const ANIM_SPEED = 3; 
+        
+        if (state.timer > ANIM_SPEED) {
+            state.timer = 0;
+            state.frame = (state.frame === 0) ? 1 : 0;
+        }
+    }
+
+    return state.frame;
 }

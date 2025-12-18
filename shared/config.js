@@ -1,4 +1,4 @@
-export const SERVER_FPS = 30;
+export const SERVER_FPS = 60;
 
 export const TILE_SIZE = 8;
 export const TILE_BIG_SIZE = 16;
