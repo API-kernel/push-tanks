@@ -111,39 +111,46 @@ export class InputHandler {
 
         if (!gp) return state; // Геймпад не подключен
 
-        // --- КНОПКИ (Standard Gamepad Mapping) ---
-        // 0: A (Fire)
-        // 12: D-Pad Up
-        // 13: D-Pad Down
-        // 14: D-Pad Left
-        // 15: D-Pad Right
-        // 9: Start (Pause/Enter)
-        // 8: Select (Tab)
-        
-        // Хелпер для проверки кнопки (она может быть объектом {pressed: true} или числом 1.0)
+        // Хелпер для проверки кнопки
         const btn = (b) => typeof b === "object" ? b.pressed : b === 1.0;
 
+        // --- 1. СТАНДАРТНЫЕ КНОПКИ (D-PAD) ---
         if (btn(gp.buttons[12])) state.up = true;
         if (btn(gp.buttons[13])) state.down = true;
         if (btn(gp.buttons[14])) state.left = true;
         if (btn(gp.buttons[15])) state.right = true;
 
-        if (btn(gp.buttons[0])) state.fire = true; // Кнопка A (X на PS)
-        if (btn(gp.buttons[2])) state.fire = true; // Кнопка X (Квадрат на PS) - альтернатива
-        
-        if (btn(gp.buttons[9])) state.start = true; // Start
-        if (btn(gp.buttons[8])) state.tab = true;   // Select
+        // Огонь / Старт
+        if (btn(gp.buttons[0])) state.fire = true; // A / X
+        if (btn(gp.buttons[2])) state.fire = true; // X / Square
+        if (btn(gp.buttons[9])) state.start = true; 
+        if (btn(gp.buttons[8])) state.tab = true;
 
-        // --- СТИКИ (Axes) ---
-        // Axis 0: Лево (-1) / Право (+1)
-        // Axis 1: Верх (-1) / Низ (+1)
-        // Deadzone (мертвая зона), чтобы не дрифтило
+        // --- 2. ЛЕВЫЙ СТИК (Axes 0, 1) ---
         const deadzone = 0.5;
-
         if (gp.axes[1] < -deadzone) state.up = true;
         if (gp.axes[1] > deadzone)  state.down = true;
         if (gp.axes[0] < -deadzone) state.left = true;
         if (gp.axes[0] > deadzone)  state.right = true;
+
+        // --- 3. СПЕЦИФИЧНАЯ ОСЬ 9 (Твоя крестовина) ---
+        // ВНИМАНИЕ: Значения float, сравниваем с допуском (epsilon)
+        if (gp.axes.length > 9) {
+            const val = gp.axes[9];
+            const epsilon = 0.1; // Допуск +/- 0.1
+
+            // Вверх: -1.0
+            if (Math.abs(val - (-1.0)) < epsilon) state.up = true;
+
+            // Вниз: 0.14 (стандарт HAT обычно ~0.142857)
+            if (Math.abs(val - 0.142) < epsilon) state.down = true;
+
+            // Влево: 0.7 (стандарт HAT обычно ~0.714285)
+            if (Math.abs(val - 0.714) < epsilon) state.left = true;
+
+            // Вправо: -0.4 (стандарт HAT обычно ~-0.42857)
+            if (Math.abs(val - (-0.428)) < epsilon) state.right = true;
+        }
 
         return state;
     }
