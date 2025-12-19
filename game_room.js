@@ -5,7 +5,7 @@ import { updateTankMovement } from './shared/tank.js';
 import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH,
-     SHIELD_DURATION, SPAWN_ANIMATION_DURATION, TEAMS_CONFIG } from './shared/config.js';
+     SHIELD_DURATION, SPAWN_ANIMATION_DURATION, TEAMS_CONFIG, SPAWN_COLUMNS } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS, ENABLE_CHEATS } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
@@ -139,9 +139,13 @@ export class GameRoom {
             inputs: { up: false, down: false, left: false, right: false, fire: false, cheat0: false }
         };
         
+        const newPlayer = this.players[uniqueId];
         if (teamId > 0) {
-            destroyBlockAt(this.map, this.players[uniqueId].x, this.players[uniqueId].y);
+            this.assignSpawnPosition(newPlayer);
+            destroyBlockAt(this.map, newPlayer.x, newPlayer.y);
             this.mapDirty = true;
+        } else {
+            newPlayer.x = -1000;
         }
     }
 
@@ -378,10 +382,7 @@ export class GameRoom {
                 p.spawnAnimTimer = 0;
                 p.level = 1;
                 
-                const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
-                p.x = sp.x;
-                p.y = sp.y;
-                
+                this.assignSpawnPosition(p);
                 const teamConfig = this.teamManager.getTeam(p.team);
                 p.direction = teamConfig ? teamConfig.direction : 'UP';
                 
@@ -504,12 +505,32 @@ export class GameRoom {
         return false;
     }
 
-    getPlayerSpawnPoint(pIndex, teamId) {
-        const priority = [8, 16, 0, 24];
-        const col = priority[pIndex % priority.length];
+    getPlayerSpawnPoint(teamRank, teamId) {
+        const col = SPAWN_COLUMNS[teamRank % SPAWN_COLUMNS.length];
+        
         const team = this.teamManager.getTeam(teamId);
         const y = team ? team.spawnPixelY : 0;
+        
         return { x: col * TILE_SIZE, y };
+    }
+
+    assignSpawnPosition(player) {
+        if (player.team === 0) return;
+        
+        // 1. Ищем всех сокомандников
+        const teammates = Object.values(this.players)
+            .filter(p => p.team === player.team)
+            // Сортируем по времени входа (playerIndex), чтобы порядок был стабильным
+            .sort((a, b) => a.playerIndex - b.playerIndex);
+            
+        // 2. Узнаем, какой я по счету (0, 1, 2...)
+        const myRank = teammates.indexOf(player);
+        
+        // 3. Получаем координаты
+        const sp = this.getPlayerSpawnPoint(myRank, player.team);
+        
+        player.x = sp.x;
+        player.y = sp.y;
     }
 
     handleVictory(winnerTeamId) {
@@ -527,24 +548,24 @@ export class GameRoom {
     }
 
     goToNextLevel() {
-        const currentStr = String(this.settings.level);
         let nextLevel = this.settings.level;
-        
-        const idx = this.mapList.indexOf(currentStr);
-        if (idx !== -1) {
-            const nextIdx = (idx + 1) % this.mapList.length;
+
+        if (this.mapList.length > 0) {
+            let nextIdx = Math.floor(Math.random() * this.mapList.length);
+            
+            if (this.mapList.length > 1) {
+                const currentStr = String(this.settings.level);
+                
+                if (this.mapList[nextIdx] === currentStr) {
+                    nextIdx = (nextIdx + 1) % this.mapList.length;
+                }
+            }
+
             nextLevel = this.mapList[nextIdx];
-        } else if (this.mapList.length > 0) {
-            nextLevel = this.mapList[0];
-        } else {
-             const num = parseInt(this.settings.level);
-             if (!isNaN(num)) nextLevel = num + 1;
+            this.settings.level = nextLevel;    
         }
 
-        this.settings.level = nextLevel;
-        
         this.io.to(this.id).emit('lobby_update', { settings: this.settings, players: this.players });
-
         this.startGame();
     }
 
@@ -579,9 +600,9 @@ export class GameRoom {
             p.spawnAnimTimer = 0;
             p.lives = this.settings.startLives
             p.level = 1;
-            const sp = this.getPlayerSpawnPoint(p.playerIndex, p.team);
-            p.x = sp.x; p.y = sp.y;
             
+            this.assignSpawnPosition(p); 
+
             const teamConfig = this.teamManager.getTeam(p.team);
             p.direction = teamConfig ? teamConfig.direction : 'UP';
 
