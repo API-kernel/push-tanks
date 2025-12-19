@@ -4,7 +4,8 @@ import { updateEnemies, hitEnemy } from './shared/enemy.js';
 import { updateTankMovement } from './shared/tank.js';
 import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
-import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH, SHIELD_DURATION, SPAWN_ANIMATION_DURATION } from './shared/config.js';
+import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH,
+     SHIELD_DURATION, SPAWN_ANIMATION_DURATION, TEAMS_CONFIG } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS, ENABLE_CHEATS } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
@@ -49,7 +50,7 @@ export class GameRoom {
             allowHotJoin: true,
             friendlyFire: false,
             startLives: 2,
-            maxActiveEnemies: 4,
+            maxActiveTanks: 6,
             botsReserve: { 1: 20, 2: 20 } 
         };
 
@@ -63,14 +64,58 @@ export class GameRoom {
         const uniqueId = `${socketId}_${localIndex}`;
         
         let pIndex = 0;
-        while (true) {
-            const occupied = Object.values(this.players).some(p => p.playerIndex === pIndex);
-            if (!occupied) break;
+        while (Object.values(this.players).some(p => p.playerIndex === pIndex)) {
             pIndex++;
         }
 
-        const teamId = 1; 
-        const sp = this.getPlayerSpawnPoint(pIndex, teamId);
+        const limit = this.settings.maxActiveTanks;
+        let teamId = 0; // По умолчанию 0 (если ничего не выйдет)
+
+
+        let preferredTeam = null;
+
+        // 1. Если это Локальный Игрок 2 (или 3...), ищем "Главного" (P1)
+        if (localIndex > 0) {
+            const p1Id = `${socketId}_0`; // ID первого игрока на этом сокете
+            const p1 = this.players[p1Id];
+            
+            // Если P1 существует и играет (не зритель), хотим к нему
+            if (p1 && p1.team > 0) {
+                preferredTeam = p1.team;
+            }
+        }
+
+        // 2. Пробуем попасть в любимую команду (Co-op)
+        if (preferredTeam) {
+            const count = this.getTeamPlayerCount(preferredTeam);
+            if (count < limit) {
+                teamId = preferredTeam;
+            }
+        }
+
+        // 3. Если команда еще не выбрана (это P1, или у P1 нет места, или P1 зритель)
+        // ИДЕМ ПО СТАНДАРТНОМУ БАЛАНСУ (PvP / Auto)
+        if (teamId === 0) {
+            const count1 = this.getTeamPlayerCount(1);
+            const count2 = this.getTeamPlayerCount(2);
+            
+            const canJoin1 = count1 < limit;
+            const canJoin2 = count2 < limit;
+
+            if (canJoin1 && canJoin2) {
+                // Если оба свободны - идем туда, где МЕНЬШЕ (баланс)
+                if (count1 <= count2) teamId = 1;
+                else teamId = 2;
+            } else if (canJoin1) {
+                teamId = 1;
+            } else if (canJoin2) {
+                teamId = 2;
+            } else {
+                teamId = 0; // Мест нет вообще -> Зритель
+            }
+        }
+
+        const sp = (teamId > 0) ? this.getPlayerSpawnPoint(pIndex, teamId) : { x: -1000, y: -1000 };
         const teamConfig = this.teamManager.getTeam(teamId);
         
         this.players[uniqueId] = {
@@ -84,9 +129,9 @@ export class GameRoom {
             isMoving: false, hp: 1, 
             lives: this.settings.startLives,
             level: 1,
-            isDead: false, 
+            isDead: (teamId === 0), // Зритель сразу мертв
             respawnTimer: 0,
-            isSpawning: true, 
+            isSpawning: (teamId > 0), // Зритель не спавнится
             spawnAnimTimer: 0,
             shieldTimer: SHIELD_DURATION,
             bulletCooldown: 0, 
@@ -94,8 +139,10 @@ export class GameRoom {
             inputs: { up: false, down: false, left: false, right: false, fire: false, cheat0: false }
         };
         
-        destroyBlockAt(this.map, this.players[uniqueId].x, this.players[uniqueId].y);
-        this.mapDirty = true;
+        if (teamId > 0) {
+            destroyBlockAt(this.map, this.players[uniqueId].x, this.players[uniqueId].y);
+            this.mapDirty = true;
+        }
     }
 
     removeLocalPlayer(socketId, localIndex) {
@@ -111,8 +158,33 @@ export class GameRoom {
         }
     }
 
+    getTeamPlayerCount(teamId) {
+        return Object.values(this.players).filter(p => p.team === teamId).length;
+    }
+
     updateSettings(newSettings) {
         this.settings = { ...this.settings, ...newSettings };
+
+        // ПРОВЕРКА ЛИМИТОВ ПОСЛЕ ИЗМЕНЕНИЯ
+        // Если хост уменьшил лимит, лишних кидаем в зрители
+        TEAMS_CONFIG.forEach(t => {
+            const teamPlayers = Object.values(this.players).filter(p => p.team === t.id);
+            const limit = this.settings.maxActiveTanks;
+            
+            if (teamPlayers.length > limit) {
+                // Сортируем: кто последним пришел (по индексу), того и кикаем
+                teamPlayers.sort((a, b) => b.playerIndex - a.playerIndex);
+                
+                const toKick = teamPlayers.length - limit;
+                for(let i=0; i < toKick; i++) {
+                    const p = teamPlayers[i];
+                    p.team = 0;
+                    p.isDead = true;
+                    p.lives = -1;
+                    p.x = -1000;
+                }
+            }
+        });
     }
 
     async startGame() {
@@ -248,7 +320,9 @@ export class GameRoom {
 
         // 1. ИГРОКИ
         for (const id in this.players) {
-            this.updatePlayer(this.players[id]);
+            if (this.players[id].team !== 0) {
+                this.updatePlayer(this.players[id]);
+            }
         }
 
         // 2. ВРАГИ
@@ -492,6 +566,14 @@ export class GameRoom {
 
         for (const id in this.players) {
             const p = this.players[id];
+
+            if (p.team === 0) {
+                p.isDead = true;
+                p.lives = -1;
+                p.x = -1000;
+                continue;
+            }
+
             p.isDead = false;
             p.isSpawning = true;
             p.spawnAnimTimer = 0;

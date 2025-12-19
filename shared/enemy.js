@@ -45,12 +45,12 @@ export function updateEnemies(room) {
         if (spawned >= totalReserve) return;
 
         // Лимит активных
-        const activeCount = (playerCounts[team.id] || 0) + 
+        const activeUnits = (room.getTeamPlayerCount(team.id) || 0) + 
                             enemies.filter(e => e.team === team.id).length + 
                             pendingSpawns.filter(s => s.team === team.id).length;
 
         // Лимит активных берем из настроек комнаты
-        if (activeCount < settings.maxActiveEnemies) {
+        if (activeUnits < settings.maxActiveTanks) {
             teamSpawnTimers[team.id]++;
             if (teamSpawnTimers[team.id] > SPAWN_DELAY) {
                 // Собираем busyEntities для умного спавна

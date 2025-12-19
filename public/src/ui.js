@@ -24,7 +24,8 @@ export function drawHUD(ctx, spritesImage, data) {
     // 1. ВРАГИ (Сетка иконок)
     
     // Определяем команду врага
-    const enemyTeamId = (myTeam === 1) ? 2 : 1; 
+    const currentTeam = (myTeam === 0) ? 1 : myTeam;
+    const enemyTeamId = (currentTeam === 1) ? 2 : 1; 
     
     // Считаем общее кол-во сил врага
     // А) Считаем живых игроков врага

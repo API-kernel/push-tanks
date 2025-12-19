@@ -102,30 +102,33 @@ io.on('connection', (socket) => {
         
         for (const id in rooms) {
             const r = rooms[id];
-            const totalPlayers = Object.keys(r.players).length;
             
-            // Лимиты: < 6 игроков
-            const hasSpace = (totalPlayers + localCount) <= 6;
-            // Можно войти, если лобби ИЛИ если игра идет и разрешен HotJoin
-            const canJoin = !r.isRunning || r.settings.allowHotJoin;
+            // Можем ли мы подключиться технически?
+            const canConnect = r.isRunning && r.settings.allowHotJoin;
+            if (!canConnect) continue;
             
-            if (hasSpace && canJoin) {
+            const limit = r.settings.maxActiveTanks;
+            const c1 = r.getTeamPlayerCount(1);
+            const c2 = r.getTeamPlayerCount(2);
+            
+            const hasSlot1 = (c1 + localCount <= limit);
+            const hasSlot2 = (c2 + localCount <= limit);
+            
+            if (hasSlot1 || hasSlot2) {
                 targetRoomId = id;
-                break;
+                break; 
             }
         }
         
         if (targetRoomId) {
-            // Нашли существующую -> Входим
             joinRoomLogic(socket, targetRoomId, localCount, false, nicknames);
         } else {
-            // Не нашли -> Создаем новую И СРАЗУ ЗАПУСКАЕМ (true)
-            let randomMap = '1'; // Фоллбэк на уровень 1, если карт нет
+            // Создаем новую
+            let randomMap = '1';
             if (availableMaps.length > 0) {
                 const randomIndex = Math.floor(Math.random() * availableMaps.length);
                 randomMap = availableMaps[randomIndex];
             }
-            
             createRoomLogic(socket, localCount, true, nicknames, randomMap);
         }
     });
@@ -176,19 +179,35 @@ io.on('connection', (socket) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const room = rooms[currentRoomId];
         const uniqueId = `${socket.id}_${data.localIndex}`;
+        const targetTeam = data.teamId;
         
         if (room.players[uniqueId]) {
-            room.players[uniqueId].team = data.teamId;
+            // Если хотим в зрители (0) — всегда пускаем
+            if (targetTeam === 0) {
+                room.players[uniqueId].team = 0;
+                 // Обнуляем параметры, чтобы не висел "призрак"
+                room.players[uniqueId].isDead = true;
+                room.players[uniqueId].x = -1000;
+                
+                io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+                return;
+            }
+
+            // Если хотим в Игру (1 или 2) — проверяем лимит
+            const limit = room.settings.maxActiveTanks;
+            const currentCount = room.getTeamPlayerCount(targetTeam);
             
-            // Обновляем направление спавна (для красоты)
-            const teamConfig = room.teamManager.getTeam(data.teamId);
-            if (teamConfig) room.players[uniqueId].direction = teamConfig.direction;
-            
-            // Обновляем позицию спавна (чтобы в лобби знать, но реально применится при рестарте)
-            // Или можно прямо сейчас сдвинуть, если игра не идет?
-            // Давай не будем двигать, пусть при старте расставит.
-            
-            io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+            if (currentCount < limit) {
+                room.players[uniqueId].team = targetTeam;
+                
+                // Обновляем направление (если нужно для респавна)
+                const teamConfig = room.teamManager.getTeam(targetTeam);
+                if (teamConfig) room.players[uniqueId].direction = teamConfig.direction;
+                
+                io.to(currentRoomId).emit('lobby_update', { players: room.players, settings: room.settings });
+            } else {
+                socket.emit('error_msg', 'TEAM IS FULL!');
+            }
         }
     });
 

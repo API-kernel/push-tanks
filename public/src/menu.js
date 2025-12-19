@@ -20,7 +20,8 @@ window.changeSettings = () => {
     if (!isMyHost) return;
     const level = document.getElementById('opt-level-select').value;
     const lives = parseInt(document.getElementById('opt-lives').value);
-    const maxActive = parseInt(document.getElementById('opt-max-active').value);
+    
+    const maxActiveTanks = parseInt(document.getElementById('opt-max-active').value);
     
     const botsGreen = parseInt(document.getElementById('opt-bots-green').value);
     const botsRed = parseInt(document.getElementById('opt-bots-red').value);
@@ -32,10 +33,10 @@ window.changeSettings = () => {
         window.tankGame.updateSettings({ 
             level, 
             startLives: lives, 
-            maxActiveEnemies: maxActive,
+            maxActiveTanks: maxActiveTanks,
             basesEnabled: bases,
             autoNextLevel: autonext,
-            botsReserve: { 1: botsGreen, 2: botsRed }, // Передаем объект
+            botsReserve: { 1: botsGreen, 2: botsRed },
             allowHotJoin: hotjoin 
         });
     }
@@ -149,10 +150,12 @@ window.updateLobbyList = (players) => {
             // Кнопки команд с подсветкой
             const yClass = p.team === 1 ? 'team-btn team-btn-yellow active' : 'team-btn team-btn-yellow';
             const gClass = p.team === 2 ? 'team-btn team-btn-green active' : 'team-btn team-btn-green';
-            
+            const sClass = p.team === 0 ? 'team-btn team-btn-gray active' : 'team-btn team-btn-gray';
+
             actionsHtml += `<button class="${yClass}" onclick="changeTeam(${p.localIndex}, 1)">YELLOW</button>`;
             actionsHtml += `<button class="${gClass}" onclick="changeTeam(${p.localIndex}, 2)">GREEN</button>`;
-            
+            actionsHtml += `<button class="${sClass}" onclick="changeTeam(${p.localIndex}, 0)">👁</button>`;
+
             // Кнопка удаления
             if (p.localIndex > 0) {
                 actionsHtml += `<button class="btn-remove" onclick="removeLocalPlayer(${p.localIndex})">×</button>`;
@@ -160,10 +163,13 @@ window.updateLobbyList = (players) => {
                 actionsHtml += `<div class="btn-placeholder"></div>`; // Пустое место для выравнивания
             }
         } else {
-            // Для чужих просто пишем команду
-            const color = p.team === 1 ? '#e6c629' : '#63db44';
-            const label = p.team === 1 ? 'YELLOW' : 'GREEN';
-            actionsHtml = `<span class="team-label" style="color: ${color}; font-weight: bold;">${label}</span>`;
+            if (p.team === 0) {
+                 actionsHtml = `<span class="team-label" style="color: #aaa; font-weight: bold;">SPECTATOR</span>`;
+            } else {
+                const color = p.team === 1 ? '#e6c629' : '#63db44';
+                const label = p.team === 1 ? 'YELLOW' : 'GREEN';
+                actionsHtml = `<span class="team-label" style="color: ${color}; font-weight: bold;">${label}</span>`;
+            }
         }
         
         div.innerHTML = nameHtml + actionsHtml;
@@ -268,7 +274,7 @@ function changeSettings() {
         window.tankGame.updateSettings({ 
             level, 
             startLives: lives, 
-            maxActiveEnemies: maxActive,
+            maxActiveTanks: maxActive,
             botsEnabled: bots,
             allowHotJoin: hotjoin 
         });
@@ -303,7 +309,7 @@ window.updateLobbyUI = (data) => {
 
         setVal('opt-hotjoin', s.allowHotJoin, true);
         setVal('opt-lives', s.startLives);
-        setVal('opt-max-active', s.maxActiveEnemies);
+        setVal('opt-max-active', s.maxActiveTanks);
         setVal('opt-bots-green', s.botsReserve[1]);
         setVal('opt-bots-red', s.botsReserve[2]);
         setVal('opt-bases', s.basesEnabled, true);
