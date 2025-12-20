@@ -17,7 +17,6 @@ window.toggleDonate = (show) => {
 };
 
 window.changeSettings = () => {
-    if (!isMyHost) return;
     const level = document.getElementById('opt-level-select').value;
     const lives = parseInt(document.getElementById('opt-lives').value);
     
@@ -246,9 +245,7 @@ window.showLobby = (roomId, isHost) => {
     document.getElementById('display-room-id').innerText = roomId;
     document.getElementById('chat-container').style.display = 'flex';
     
-    if (isHost) {
-        document.getElementById('btn-start').style.display = 'block';
-    }
+    document.getElementById('btn-start').style.display = 'block';
 };
 
 window.hideMenu = () => {
@@ -298,13 +295,13 @@ window.updateLobbyUI = (data) => {
             if (isCheck) el.checked = val;
             else el.value = val;
             
-            el.disabled = !isMyHost;
+            el.disabled = false;
         };
         
         const sel = document.getElementById('opt-level-select');
         if (sel) {
             sel.value = s.level;
-            sel.disabled = !isMyHost;
+            sel.disabled = false;
         }
 
         setVal('opt-hotjoin', s.allowHotJoin, true);
