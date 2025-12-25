@@ -327,7 +327,7 @@ function draw() {
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
     drawMapLayers(ctx, game.sprites, serverState.map, Date.now()); 
-    drawBases(ctx, game.sprites, serverState.bases); 
+    drawBases(ctx, game.sprites, serverState.bases, serverState.settings); 
     
 
     drawBullets(ctx, game.sprites, serverState.bullets);

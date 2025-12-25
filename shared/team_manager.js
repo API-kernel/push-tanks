@@ -70,7 +70,8 @@ export class TeamManager {
             if (map[w.r] && map[w.r][w.c] !== undefined) {
                 map[w.r][w.c] = {
                     type: newType,
-                    mask: BLOCK_FULL
+                    mask: BLOCK_FULL,
+                    isBaseWall: true
                 };
             }
         });

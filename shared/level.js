@@ -1,4 +1,5 @@
-import { BLOCK_FULL, BASE_WALLS, TEAMS_CONFIG, TILE_SIZE } from './config.js';
+import { TEAMS_CONFIG, TILE_SIZE } from './config.js';
+import { teamManager } from './team_manager.js';
 
 export function createLevel(rawMapData, basesEnabled) {
     if (!rawMapData) return [];
@@ -41,15 +42,7 @@ export function createLevel(rawMapData, basesEnabled) {
 
     if (basesEnabled) {
         TEAMS_CONFIG.forEach(team => {
-            const walls = BASE_WALLS[team.id];
-            if (walls) {
-                walls.forEach(w => {
-                    if (map[w.r] && map[w.r][w.c]) {
-                        map[w.r][w.c].type = 1;
-                        map[w.r][w.c].mask = BLOCK_FULL;
-                    }
-                });
-            }
+            teamManager.fortifyBase(team.id, false, map, true);
         });
 
         // АВТО-УКРЕПЛЕНИЕ (Line of Sight)

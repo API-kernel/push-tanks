@@ -47,9 +47,10 @@ export class GameRoom {
             level: 1,
             basesEnabled: true, 
             autoNextLevel: false,
+            vibraniumBase: true,
             allowHotJoin: true,
             friendlyFire: false,
-            startLives: 2,
+            startLives: 4,
             maxActiveTanks: 6,
             botsReserve: { 1: 20, 2: 20 } 
         };
@@ -338,7 +339,7 @@ export class GameRoom {
         updateEnemies(this);
 
         // 3. ПУЛИ
-        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager);
+        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager, this.settings.vibraniumBase);
         this.bulletEvents.push(...bEvents);
         if (bEvents.some(e => e.type === 'HIT')) {
             this.mapDirty = true;

@@ -42,7 +42,7 @@ export function createBullet(shooter, speed) {
     };
 }
 
-export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager) {
+export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager, vibraniumEnabled) {
     const events = [];
 
     for (let i = bulletsList.length - 1; i >= 0; i--) {
@@ -60,16 +60,26 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManag
 
         for (let s = 0; s < steps; s++) {
             // Проверка перед шагом
-            let collisionResult = checkCollisionAndDestroy(b, map, teamManager);
+            let collisionResult = checkCollisionAndDestroy(b, map, teamManager, vibraniumEnabled);
             if (collisionResult) {
-                events.push({ 
-                    type: 'HIT', 
-                    x: b.x, y: b.y, 
-                    ownerId: b.ownerId,
-                    isSteel: collisionResult === 'STEEL',
-                    isSteelNoDmg: collisionResult === 'STEEL_NO_DMG',
-                    level: b.ownerLevel
-                });
+                if (collisionResult === 'VIBRANIUM_PING') {
+                    b.isDead = true;
+                    events.push({ 
+                        type: 'ARMOR_HIT',
+                        x: b.x, y: b.y, 
+                        ownerId: b.ownerId 
+                    });
+                } 
+                else {
+                    events.push({ 
+                        type: 'HIT', 
+                        x: b.x, y: b.y, 
+                        ownerId: b.ownerId,
+                        isSteel: collisionResult === 'STEEL',
+                        isSteelNoDmg: collisionResult === 'STEEL_NO_DMG',
+                        level: b.ownerLevel
+                    });
+                }
                 break; 
             }
 
@@ -91,11 +101,12 @@ function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
-function checkCollisionAndDestroy(bullet, map, teamManager) {
+function checkCollisionAndDestroy(bullet, map, teamManager, vibraniumEnabled) {
     if (bullet.isDead) return false;
 
     let hitDetected = false;
     let isSteelHit = false;
+    let hitBlock = null;
     let contactEdge = (bullet.direction === 'UP' || bullet.direction === 'LEFT') ? -Infinity : Infinity;
 
     const startCol = Math.floor(bullet.x / TILE_SIZE);
@@ -122,6 +133,7 @@ function checkCollisionAndDestroy(bullet, map, teamManager) {
 
                             if (checkRectIntersection(bulletRect, subRect)) {
                                 hitDetected = true;
+                                hitBlock = block;
                                 if (block.type === 2) isSteelHit = true;
 
                                 // Находим грань стены (Contact Edge)
@@ -157,6 +169,13 @@ function checkCollisionAndDestroy(bullet, map, teamManager) {
     }
 
     bullet.isDead = true;
+
+    if (vibraniumEnabled && hitBlock && hitBlock.isBaseWall) {
+        if (Math.random() > 0.05) {
+            return 'VIBRANIUM_PING'; 
+        }
+    }
+
     if (isSteelHit && bullet.ownerLevel < 4) return 'STEEL_NO_DMG';
 
     // 2. DISCRETE DESTRUCTION (Дискретное разрушение)

@@ -87,8 +87,14 @@ export function drawForest(ctx, spritesImage, levelMap) {
 
 // --- СУЩНОСТИ ---
 
-export function drawBases(ctx, spritesImage, bases) {
+export function drawBases(ctx, spritesImage, bases, settings) {
     if (!bases) return;
+
+    const now = Date.now();
+    const isVibranium = settings && settings.vibraniumBase;
+    const isVisibleWindow = (now % 3000) < 250;
+    const shieldFrameIndex = Math.floor(now / 50) % 2;
+
     bases.forEach(base => {
         const teamName = (base.team === 1) ? 'yellow' : 'green';
         const key = `base_${teamName}`;
@@ -97,6 +103,15 @@ export function drawBases(ctx, spritesImage, bases) {
         
         const sprite = SPRITES[`${key}_${state}`]; 
         ctx.drawImage(spritesImage, ...sprite, base.x, base.y, 16, 16);
+
+        // 2. Рисуем Щит поверх, если база жива и таймер сработал
+        if (!base.isDead && isVibranium && isVisibleWindow) {
+            const shieldSprite = SPRITES.shield[shieldFrameIndex]; 
+            
+            if (shieldSprite) {
+                ctx.drawImage(spritesImage, ...shieldSprite, base.x, base.y, 16, 16);
+            }
+        }
     });
 }
 
