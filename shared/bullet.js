@@ -171,7 +171,7 @@ function checkCollisionAndDestroy(bullet, map, teamManager, vibraniumEnabled) {
     bullet.isDead = true;
 
     if (vibraniumEnabled && hitBlock && hitBlock.isBaseWall) {
-        if (Math.random() > 0.05) {
+        if (Math.random() > 0.1) {
             return 'VIBRANIUM_PING'; 
         }
     }
