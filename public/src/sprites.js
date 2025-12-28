@@ -35,10 +35,10 @@ export const SPRITES = {
     // --- БОТЫ (Бонусные / Красные) ---
     // Они находятся справа (X+128, col 8)
     // Для Желтых (Rows 4-7, Cols 8-9)
-    bot_yellow_basic_red: getTankFrames(12, 8),
-    bot_yellow_fast_red:  getTankFrames(13, 8),
-    bot_yellow_armor_red: getTankFrames(14, 8),
-    bot_yellow_heavy_red: getTankFrames(15, 8),
+    bot_yellow_basic_red: getTankFrames(4, 8),
+    bot_yellow_fast_red:  getTankFrames(5, 8),
+    bot_yellow_armor_red: getTankFrames(6, 8),
+    bot_yellow_heavy_red: getTankFrames(7, 8),
 
     // Для Зеленых (Rows 12-15, Cols 8-9)
     bot_green_basic_red: getTankFrames(12, 8),
