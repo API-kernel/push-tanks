@@ -307,7 +307,7 @@ export function createExplosion(x, y, type = EXPLOSION_SMALL) {
         x, y, type,
         frameIndex: 0,
         timer: 0,
-        animationSpeed: 9,// Мы рендеримся через requestAnimationFrame (обычно 60 FPS).
+        animationSpeed: 4,// Мы рендеримся через requestAnimationFrame (обычно 60 FPS).
         isDead: false
     });
 }

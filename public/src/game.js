@@ -2,7 +2,7 @@ import { initChat } from './chat.js';
 import { InputHandler } from './input.js';
 import { drawHUD } from './ui.js';
 import { audio } from './audio.js';
-import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING, TILE_SIZE } from '../shared/config.js'; 
+import { CANVAS_WIDTH, CANVAS_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PADDING, TILE_SIZE, TILE_BIG_SIZE } from '../shared/config.js'; 
 import { drawMapLayers, drawForest, drawBullets, drawPlayerNames,
      drawEnemies, drawPlayers, drawExplosions, 
      drawBases, drawBonus, updateExplosions, createExplosion,
@@ -24,6 +24,8 @@ const game = {
     isLoaded: false,
     input: new InputHandler()
 };
+
+
 
 let serverState = {
     players: {},
@@ -65,6 +67,16 @@ window.tankGame = {
     removeLocalPlayer: (idx) => socket.emit('remove_local_player', idx),
     updateSettings: (settings) => socket.emit('update_settings', settings)
 };
+
+let currentPing = 0;
+
+setInterval(() => {
+    socket.emit('latency_ping', Date.now());
+}, 1000);
+
+socket.on('latency_pong', (sentTime) => {
+    currentPing = Date.now() - sentTime;
+});
 
 // --- СОБЫТИЯ ЛОББИ ---
 
@@ -290,9 +302,7 @@ function update() {
 
     game.showNames = game.input.isShowNamesPressed() || (Date.now() - gameStartTime < 5000);
 
-    updateExplosions();
 
-    socket.emit('input', inputs);
     updateExplosions();
 }
 
@@ -413,7 +423,7 @@ function draw() {
     const hudCenterX = (MAP_WIDTH + PADDING + 16) * SCALE;
     
     // Высота: Чуть выше нижней границы игрового поля (MAP_HEIGHT + PADDING)
-    const hudY = (MAP_HEIGHT + PADDING - 10) * SCALE; 
+    const hudY = (MAP_HEIGHT + PADDING - TILE_BIG_SIZE) * SCALE; 
 
     uiCtx.save();
     // Шрифт поменьше (было 36)
@@ -437,6 +447,20 @@ function draw() {
     uiCtx.textAlign = 'left';
     uiCtx.fillStyle = '#008C31'; 
     uiCtx.fillText(score2, hudCenterX + 10, hudY);
+
+    // 2. ПИНГ (Рисуем под счетом)
+    const pingY = (MAP_HEIGHT + PADDING - 3) * SCALE;
+    
+    uiCtx.font = '10px "Press Start 2P", monospace'; // Мелкий шрифт
+    uiCtx.textAlign = 'center';
+    
+    // Цвет зависит от качества связи
+    if (currentPing < 100) uiCtx.fillStyle = 'black'; // Зеленый (Хорошо)
+    else if (currentPing < 200) uiCtx.fillStyle = '#e6c629'; // Желтый (Средне)
+    else uiCtx.fillStyle = '#e52424'; // Красный (Плохо)
+
+    uiCtx.fillText(`PING: ${currentPing}`, hudCenterX, pingY);
+
 
     uiCtx.restore();
     

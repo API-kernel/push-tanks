@@ -94,6 +94,10 @@ io.on('connection', (socket) => {
         joinRoomLogic(socket, roomId, data.localCount || 1, false, data.nicknames);
     });
 
+    socket.on('latency_ping', (timestamp) => {
+        socket.emit('latency_pong', timestamp);
+    });
+
     // 3. Quick Play (Матчмейкинг)
     socket.on('quick_play', (config) => {
         const localCount = config.localCount || 1;
