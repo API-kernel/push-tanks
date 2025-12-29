@@ -10,32 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - name: RU Server
-            host: ${{ secrets.HOST }}     
-          - name: NL Server
-            host: ${{ secrets.HOST_NL }}  
-            
+        # Просто метки, без секретов
+        target: [RU, NL]
+
     steps:
-      - name: Deploying to ${{ matrix.name }}
+      - name: Deploying to ${{ matrix.target }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ matrix.host }}
-          username: ${{ secrets.USERNAME }} 
-          key: ${{ secrets.SSH_KEY }}       
+          # ЛОГИКА ВЫБОРА IP:
+          # Если target == RU, берем secrets.HOST
+          # Иначе (NL), берем secrets.HOST_NL
+          host: ${{ matrix.target == 'RU' && secrets.HOST || secrets.HOST_NL }}
+          
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Переходим в папку
+            # 1. Переходим в папку (папка одна и та же на обоих серверах)
             cd /var/www/tanks
             
-            # Обновляем код
+            # 2. Обновляем код
             git reset --hard origin/master
             git pull origin master
             
-            # Обновляем зависимости
+            # 3. Обновляем зависимости
             npm install
             
-            # Перезапускаем PM2
+            # 4. Рестарт
             pm2 restart all
             
-            echo "DEPLOY TO ${{ matrix.name }} SUCCESSFUL! 🚀"
+            echo "DEPLOY TO ${{ matrix.target }} SUCCESSFUL! 🚀"
