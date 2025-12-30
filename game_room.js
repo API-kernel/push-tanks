@@ -397,7 +397,8 @@ export class GameRoom {
         if (ENABLE_CHEATS) {
             if (p.cheatCooldown > 0) p.cheatCooldown--;
             if (p.inputs.cheat0 && p.cheatCooldown <= 0) {
-                this.activeBonus = spawnBonus(p.x, p.y - 32); 
+                const bases = this.teamManager.getAllBases();
+                this.activeBonus = spawnBonus(this.map, bases, p.x, p.y - 32); 
                 if(this.activeBonus) this.bulletEvents.push({type: 'BONUS_SPAWN'});
                 p.cheatCooldown = SERVER_FPS / 2;
             }

@@ -9,7 +9,8 @@ export function hitEnemy(room, index) {
     const result = { isDead: false, bonusDropped: false };
 
     if (enemy.isBonus) {
-        room.activeBonus = spawnBonus(); 
+        const bases = room.teamManager.getAllBases();
+        room.activeBonus = spawnBonus(room.map, bases); 
         result.bonusDropped = true;
     }
 
