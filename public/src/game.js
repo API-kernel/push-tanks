@@ -362,7 +362,8 @@ function draw() {
         pendingSpawns: serverState.pendingSpawns,
         settings: serverState.settings,
         botsSpawnedCount: serverState.botsSpawnedCount,
-        myTeam: myTeam
+        myTeam: myTeam,
+        myId: myId
     };
 
     drawHUD(ctx, game.sprites, hudData);
