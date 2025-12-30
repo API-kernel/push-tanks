@@ -773,3 +773,27 @@ body.mobile-mode .menu-footer {
     color: black;
     box-shadow: 0 0 5px #aaa;
 }
+
+#menu-nickname {
+    background: transparent;     /* Прозрачный фон */
+    border: none;                /* Убираем рамку */
+    border-bottom: 4px solid #555; /* Только нижняя черта (темно-серая) */
+    color: white;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 20px;             /* Шрифт покрупнее */
+    padding: 10px;
+    text-align: center;
+    width: 240px;
+    text-transform: uppercase;
+    outline: none;
+    transition: all 0.2s;
+    margin-bottom: 20px;         /* Отступ от кнопок побольше */
+}
+
+/* Также давай покрасим LABEL (надпись CALLSIGN), чтобы она выделялась */
+label[for="menu-nickname"] {
+    color: #fca048 !important;   /* Оранжевый цвет (как у системных сообщений) */
+    font-size: 10px !important;
+    letter-spacing: 2px;
+    margin-bottom: 10px !important;
+}

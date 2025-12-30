@@ -43,6 +43,14 @@ window.changeSettings = () => {
     }
 };
 
+window.addEventListener('load', () => {
+    const savedName = localStorage.getItem('tank_nick_p1');
+    const input = document.getElementById('menu-nickname');
+    if (input) {
+        input.value = savedName || "PLAYER";
+    }
+});
+
 window.updateMapSelector = (list) => {
     const select = document.getElementById('opt-level-select'); // Создадим его в HTML
     if (!select) return;
@@ -255,12 +263,12 @@ window.hideMenu = () => {
     document.getElementById('lobby-screen').style.display = 'none';
 };
 
-function quickPlay() {
+window.quickPlay = () => {
     if (window.tankGame) {
         window.tankGame.initAudio();
         window.tankGame.quickPlay(localPlayersCount, getNicknames());
     }
-}
+};
 
 function changeSettings() {
     if (!isMyHost) return;
@@ -281,8 +289,21 @@ function changeSettings() {
 }
 
 function getNicknames() {
-    const n1 = localStorage.getItem('tank_nick_p1') || "P1";
-    const n2 = localStorage.getItem('tank_nick_p2') || "P2";
+    // 1. Пытаемся взять из инпута
+    const input = document.getElementById('menu-nickname');
+    let n1 = input ? input.value.trim() : "";
+
+    // 2. Если пусто — берем из памяти или дефолт
+    if (!n1) {
+        n1 = localStorage.getItem('tank_nick_p1') || "PLAYER";
+    }
+
+    // 3. Сохраняем актуальное (чтобы при рефреше осталось)
+    localStorage.setItem('tank_nick_p1', n1);
+
+    // 4. Второй игрок (у него нет инпута в главном меню, берем из памяти)
+    const n2 = localStorage.getItem('tank_nick_p2') || "PLAYER 2";
+    
     return [n1, n2];
 }
 
