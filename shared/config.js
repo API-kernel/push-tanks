@@ -103,5 +103,5 @@ export const BULLET_COOLDOWN_FAST = 8;
 
 export const CHAT_HISTORY_LENGTH = 100;
 
-export const TANK_SNAP_GRID = 4;
-export const TANK_SNAP_TOLERANCE = 4;
+export const TANK_SMART_ALIGN_RANGE = 3;
+export const TANK_SMART_ALIGN_SPEED = 4;

@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS, TANK_SNAP_GRID, TANK_SNAP_TOLERANCE } from './config.js';
+import { TILE_SIZE, TILE_BIG_SIZE, SERVER_FPS, TANK_SMART_ALIGN_RANGE, TANK_SMART_ALIGN_SPEED } from './config.js';
 import { canMoveTo } from './physics.js';
 
 export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, onCheckCollision) {
@@ -49,50 +49,79 @@ export function updateTankMovement(tank, direction, gameWidth, gameHeight, map, 
         return false;
     }
 
-    if (!canMoveTo(nextX, nextY, map)) {
-        tank.isMoving = false;
-        tank.slideTimer = 0; // Стоп
-        return false;
-    }
+    // 2. Проверка физики стен + SMART ALIGN (Ассистент вписывания)
+    let moveAllowed = canMoveTo(nextX, nextY, map);
 
-    if (onCheckCollision(nextX, nextY, tank.x, tank.y, tank.id)) {
-        tank.isMoving = false;
-        tank.slideTimer = 0; // Стоп
-        return false;
-    }
-
-    tank.x = nextX;
-    tank.y = nextY;
-
-    // --- GRID ASSIST
-    const axis = (direction === 'UP' || direction === 'DOWN') ? 'x' : 'y';
-    
-    // Центр танка по оси выравнивания
-    const center = tank[axis] + TILE_BIG_SIZE / 2; 
-    
-    const nearestGrid = Math.round(center / TANK_SNAP_GRID) * TANK_SNAP_GRID;
-    const diff = nearestGrid - center;
-
-    // Если мы не на сетке, но близко к ней
-    if (Math.abs(diff) > 0 && Math.abs(diff) < TANK_SNAP_TOLERANCE) {
+    if (!moveAllowed) {
+        // Мы врезались. Попробуем найти проход рядом.
         
-        // Пытаемся сдвинуться перпендикулярно движению
-        const snapX = (axis === 'x') ? tank.x + Math.sign(diff) : tank.x;
-        const snapY = (axis === 'y') ? tank.y + Math.sign(diff) : tank.y;
+        // Определяем ось скольжения (перпендикулярно движению)
+        const axis = (direction === 'UP' || direction === 'DOWN') ? 'x' : 'y';
         
-        // Проверяем, не врежемся ли мы при сдвиге
-        // (Используем ту же функцию canMoveTo и onCheckCollision, что и для основного движения)
-        const canShiftMap = canMoveTo(snapX, snapY, map);
-        const canShiftTank = !onCheckCollision(snapX, snapY, tank.x, tank.y, tank.id);
+        // В какую сторону искать? (Сначала ищем ближайший "центр клетки")
+        // Центр танка
+        const center = tank[axis] + TILE_BIG_SIZE / 2;
+        // Ближайшая сетка 16px (размер прохода обычно 16 или 8)
+        const snapGrid = 8; // Сетка карты
+        const nearest = Math.round(center / snapGrid) * snapGrid;
+        const diff = nearest - center; // Куда нам надо сдвинуться (-4..+4)
+
+        // Мы пробуем сдвинуться в сторону nearest, но если там занято, то пробуем в другую.
+        // Но проще перебрать диапазон.
         
-        if (canShiftMap && canShiftTank) {
-            // Двигаем танк к сетке
-            // Скорость выравнивания = 1 пиксель за кадр (или меньше, если diff < 1)
-            const shiftAmount = Math.sign(diff) * Math.min(Math.abs(diff), 1);
-            
-            if (axis === 'x') tank.x += shiftAmount; 
-            else tank.y += shiftAmount;
+        let slipFound = false;
+        
+        // Проверяем сдвиги в диапазоне от 1px до LIMIT
+        // Приоритет отдаем той стороне, куда мы ближе (diff)
+        const checkOrder = diff > 0 ? [1, -1] : [-1, 1];
+        
+        for (let offset = 1; offset <= TANK_SMART_ALIGN_RANGE; offset++) {
+            for (let sign of checkOrder) {
+                const shift = offset * sign;
+                
+                // Проверяем: если мы сдвинемся перпендикулярно, сможем ли мы ехать вперед?
+                let tryX = nextX;
+                let tryY = nextY;
+                
+                if (axis === 'x') tryX += shift;
+                else tryY += shift;
+
+                if (canMoveTo(tryX, tryY, map)) {
+                    // УРА! Нашли проход.
+                    // Теперь двигаем танк не вперед, а В СТОРОНУ прохода.
+                    // Скорость бокового скольжения
+                    const slideSpeed = tank.speed * TANK_SMART_ALIGN_SPEED;
+                    const realShift = Math.sign(shift) * Math.min(Math.abs(shift), slideSpeed);
+                    
+                    if (axis === 'x') tank.x += realShift;
+                    else tank.y += realShift;
+                    
+                    slipFound = true;
+                    // Мы не двигаемся вперед в этом кадре (или двигаемся совсем чуть-чуть), 
+                    // мы "соскальзываем" в дырку. В следующем кадре мы уже попадем в canMoveTo.
+                    break;
+                }
+            }
+            if (slipFound) break;
         }
+
+        if (!slipFound) {
+            tank.isMoving = false;
+            tank.slideTimer = 0;
+            return false;
+        }
+    } else {
+        // 3. Проверка коллизий с сущностями (Танками/Базой)
+        // (Делаем только если стена не мешает)
+        if (onCheckCollision(nextX, nextY, tank.x, tank.y, tank.id)) {
+            tank.isMoving = false;
+            tank.slideTimer = 0;
+            return false;
+        }
+
+        // Если все ок - едем
+        tank.x = nextX;
+        tank.y = nextY;
     }
 
     tank.x = Math.max(0, Math.min(tank.x, gameWidth - TILE_BIG_SIZE));
