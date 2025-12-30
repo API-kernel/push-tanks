@@ -71,9 +71,18 @@ export class BattleSystem {
                         // Логика получения урона
                         if (tank.inputs) { 
                             // ЭТО ИГРОК
-                            isDead = true; // Игрок умирает с 1 попадания
-                            const killer = this.getOwnerName(b.ownerId);
-                            this.room.sendSystemMessage(`${tank.nickname} killed by ${killer}`);
+                            tank.hp--; // Снимаем жизнь
+
+                            if (tank.hp <= 0) {
+                                isDead = true; // Умер окончательно
+                                const killer = this.getOwnerName(b.ownerId);
+                                this.room.sendSystemMessage(`${tank.nickname} killed by ${killer}`);
+                            } else {
+                                // ВЫЖИЛ!
+                                isDead = false;
+                                // Играем звук брони (как у тяжелых ботов)
+                                this.room.bulletEvents.push({ type: 'ARMOR_HIT', x: tank.x, y: tank.y });
+                            }
                         } else { 
                             // ЭТО БОТ
                             const idx = enemies.indexOf(tank);

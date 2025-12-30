@@ -127,7 +127,8 @@ export class GameRoom {
             x: sp.x, y: sp.y,
             speed: TANK_STATS.player.speed,
             direction: teamConfig ? teamConfig.direction : 'UP',
-            isMoving: false, hp: 1, 
+            isMoving: false, 
+            hp: TANK_STATS.player.levels[1].hp, 
             lives: this.settings.startLives,
             level: 1,
             isDead: (teamId === 0), // Зритель сразу мертв
@@ -382,6 +383,7 @@ export class GameRoom {
                 p.isSpawning = true;
                 p.spawnAnimTimer = 0;
                 p.level = 1;
+                p.hp = TANK_STATS.player.levels[1].hp;
                 
                 this.assignSpawnPosition(p);
                 const teamConfig = this.teamManager.getTeam(p.team);
@@ -467,9 +469,14 @@ export class GameRoom {
                 break;
             case 'star': 
                 player.level++; 
-                if(player.level>4) player.level=4; 
+                if(player.level>4) 
+                    player.level=4; 
+                    player.hp = TANK_STATS.player.levels[player.level].hp; // Максимум
                 break;
-            case 'gun': player.level = 4; break;
+            case 'gun': 
+                player.level = 4;
+                player.hp = TANK_STATS.player.levels[player.level].hp;
+                break;
             case 'grenade':
                 this.bulletEvents.push({ type: 'GRENADE_EXPLODE' });
                 for(let i = this.enemies.length-1; i>=0; i--) {

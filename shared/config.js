@@ -15,7 +15,7 @@ export const CANVAS_WIDTH = PADDING + MAP_WIDTH + HUD_WIDTH + 16;
 export const CANVAS_HEIGHT = MAP_HEIGHT + PADDING * 2;
 
 export const SPAWN_COLUMNS = [8, 16, 0, 24];
-export const ENABLE_CHEATS = false; 
+export const ENABLE_CHEATS = true; 
 
 // Просто массив настроек.
 export const TEAMS_CONFIG = [
@@ -51,12 +51,11 @@ export const TANK_STATS = {
 
     player: { 
         speed: TANK_SPEED_FAST / SERVER_FPS, 
-        hp: 1, 
         levels: {
-            1: { bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.33 * SERVER_FPS), canBreakSteel: false }, 
-            2: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 1, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  }, 
-            3: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  },
-            4: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: true }
+            1: { bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, hp: 1, bulletCount: 1, cooldown: Math.floor(0.33 * SERVER_FPS), canBreakSteel: false }, 
+            2: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, hp: 1, bulletCount: 1, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  }, 
+            3: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, hp: 2, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: false  },
+            4: { bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, hp: 2, bulletCount: 2, cooldown: Math.floor(0.20 * SERVER_FPS), canBreakSteel: true }
         }
     }
 };
