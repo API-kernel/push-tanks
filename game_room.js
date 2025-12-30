@@ -31,7 +31,7 @@ export class GameRoom {
         this.teamSpawnTimers = {};
         this.enemyIdCounter = 1000;
         
-        this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
+        this.effectTimers = { shovels: { 1: 0, 2: 0 }, clock: 0, clockTeam: 0 };
         
         this.isPaused = false;
         this.isGameOver = false;
@@ -350,24 +350,28 @@ export class GameRoom {
         this.battleSystem.update();
 
         // --- МИГАНИЕ СТЕН (Лопата заканчивается) ---
-        if (this.effectTimers.shovel > 0) {
-            this.effectTimers.shovel--;
-            
-            if (this.effectTimers.shovel < 3 * SERVER_FPS) {
-                // Мигаем каждые 30 кадров (0.5 сек)
-                if (this.effectTimers.shovel % (SERVER_FPS / 2) === 0) {
-                    const phase = Math.floor(this.effectTimers.shovel / (SERVER_FPS / 2)) % 2;
-                    const isSteel = (phase === 0);
-                    this.teamManager.fortifyBase(this.effectTimers.shovelTeam, isSteel, this.map);
+        [1, 2].forEach(teamId => {
+            if (this.effectTimers.shovels[teamId] > 0) {
+                this.effectTimers.shovels[teamId]--;
+                const timer = this.effectTimers.shovels[teamId];
+
+                // Мигание (последние 3 секунды), но строго пока таймер > 0
+                if (timer < 3 * SERVER_FPS && timer > 0) {
+                    if (timer % (SERVER_FPS / 2) === 0) {
+                        const phase = Math.floor(timer / SERVER_FPS / 2) % 2;
+                        const isSteel = (phase === 0);
+                        this.teamManager.fortifyBase(teamId, isSteel, this.map);
+                        this.mapDirty = true;
+                    }
+                }
+                
+                // Время вышло - возвращаем кирпич
+                if (timer === 0) {
+                    this.teamManager.fortifyBase(teamId, false, this.map);
                     this.mapDirty = true;
                 }
             }
-            
-            if (this.effectTimers.shovel === 0) {
-                this.teamManager.fortifyBase(this.effectTimers.shovelTeam, false, this.map);
-                this.mapDirty = true;
-            }
-        }
+        });
 
 
         // 5. ОТПРАВКА
@@ -440,14 +444,6 @@ export class GameRoom {
                 this.bullets.push(bullet);
                 this.bulletEvents.push({ type: 'PLAYER_FIRE', ownerId: p.id });
                 p.bulletCooldown = stats.cooldown;
-                
-                // if (p.level == 1) {
-                //     p.bulletCooldown = Math.round(SERVER_FPS / 2);
-                // } else if (p.level <= 3) {
-                //     p.bulletCooldown = Math.round(SERVER_FPS / 3);
-                // } else {
-                //     p.bulletCooldown = Math.round(SERVER_FPS / 5);
-                // }
             }
         }
     }
@@ -463,8 +459,10 @@ export class GameRoom {
                 this.effectTimers.clockTeam = player.team; 
                 break;
             case 'shovel': 
-                this.effectTimers.shovel = SHOVEL_DURATION; 
-                this.effectTimers.shovelTeam = player.team; 
+                // Ставим таймер конкретно для этой команды
+                this.effectTimers.shovels[player.team] = SHOVEL_DURATION;
+                
+                // Сразу строим бетон
                 this.teamManager.fortifyBase(player.team, true, this.map); 
                 this.mapDirty = true; 
                 break;
@@ -586,7 +584,7 @@ export class GameRoom {
         this.winnerTeamId = null;
         this.isGameOver = false;
         this.gameOverTimer = 0;
-        this.effectTimers = { shovel: 0, shovelTeam: 0, clock: 0, clockTeam: 0 };
+        this.effectTimers = { shovels: { 1: 0, 2: 0 }, clock: 0, clockTeam: 0 };
         this.botsSpawnedCount = { 1: 0, 2: 0 };
 
         this.teamManager = new TeamManager();
