@@ -47,8 +47,8 @@ window.tankGame = {
     createRoom: (localCount, nicknames) => {
         socket.emit('create_room', { localCount, nicknames });
     },
-    joinRoom: (roomId, localCount) => {
-        socket.emit('join_room', { roomId, localCount });
+    joinRoom: (roomId, localCount, nicknames) => {
+        socket.emit('join_room', { roomId, localCount, nicknames }); 
     },
     requestStart: () => {
         socket.emit('start_game');
@@ -155,12 +155,11 @@ socket.on('connect', () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room');
+    
     if (roomCode) {
-        const n1 = localStorage.getItem('tank_nick_p1') || "Player 1";
-        socket.emit('join_room', { roomId: roomCode, localCount: 1, nicknames: [n1] });
-        
-        // Очищаем URL, чтобы при F5 не заходить вечно
-        window.history.replaceState({}, document.title, "/");
+        if (window.initJoinMode) {
+            window.initJoinMode(roomCode);
+        }
     }
 });
 

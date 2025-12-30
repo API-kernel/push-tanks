@@ -288,6 +288,45 @@ function changeSettings() {
     }
 }
 
+let targetRoomId = null; // Запоминаем ID комнаты из ссылки
+
+window.initJoinMode = (code) => {
+    targetRoomId = code;
+    
+    // 1. Находим кнопку CREATE ROOM
+    const createBtn = document.querySelector('button[onclick="createRoom()"]');
+    const quickBtn = document.querySelector('button[onclick="quickPlay()"]');
+    
+    if (createBtn) {
+        createBtn.innerText = `JOIN ROOM ${code}`;
+        createBtn.style.borderColor = "#fca048"; // Оранжевый
+        createBtn.style.color = "#fca048";
+        createBtn.style.animation = "pulse 2s infinite";
+        
+        // Переопределяем клик
+        createBtn.onclick = () => {
+            joinSpecificRoom(code);
+        };
+    }
+    
+    // Скрываем Quick Play, чтобы не отвлекала (опционально)
+    if (quickBtn) {
+        quickBtn.style.display = 'none';
+    }
+};
+
+function joinSpecificRoom(code) {
+    // Эта функция похожа на quickPlay, но с конкретным ID
+    if (window.tankGame) {
+        window.tankGame.initAudio();
+        // Используем наш хелпер для ников
+        window.tankGame.joinRoom(code, localPlayersCount, getNicknames()); 
+        
+        // Очищаем URL, чтобы при F5 не предлагало снова
+        window.history.replaceState({}, document.title, "/");
+    }
+}
+
 function getNicknames() {
     // 1. Пытаемся взять из инпута
     const input = document.getElementById('menu-nickname');
