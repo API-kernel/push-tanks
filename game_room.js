@@ -12,7 +12,7 @@ import { BattleSystem } from './battle_system.js';
 import fs from 'fs/promises';
 
 export class GameRoom {
-    constructor(roomId, io, mapList = []) {
+    constructor(roomId, io = null, mapList = []) {
         this.id = roomId;
         this.io = io;
         this.mapList = mapList;
@@ -212,19 +212,21 @@ export class GameRoom {
         this.resetGame(); 
         this.isRunning = true;
         
-        // Очищаем старый интервал на всякий случай
-        if (this.interval) clearInterval(this.interval);
-        
-        this.interval = setInterval(() => this.update(), 1000 / SERVER_FPS);
-        
-        this.io.to(this.id).emit('game_start');
-        this.io.to(this.id).emit('map_init', this.map);
+        if (this.io) {
+            if (this.interval) clearInterval(this.interval);
+            this.interval = setInterval(() => this.update(), 1000 / SERVER_FPS);
+            
+            this.io.to(this.id).emit('game_start');
+            this.io.to(this.id).emit('map_init', this.map);
+        }
     }
 
     stopGame() {
         this.isRunning = false;
-        if (this.interval) clearInterval(this.interval);
-        this.io.to(this.id).emit('game_end');
+        if (this.io) {
+            if (this.interval) clearInterval(this.interval);
+            this.io.to(this.id).emit('game_end');
+        }
     }
 
     togglePause() {
@@ -245,9 +247,11 @@ export class GameRoom {
         this.isRunning = false;
         if (this.interval) clearInterval(this.interval);
         this.interval = null;
-        
-        this.io.to(this.id).emit('return_to_lobby');
-        this.io.to(this.id).emit('lobby_update', { players: this.players, settings: this.settings });
+         
+        if (this.io) {
+            this.io.to(this.id).emit('return_to_lobby');
+            this.io.to(this.id).emit('lobby_update', { players: this.players, settings: this.settings })   
+        };
     }
 
     update() {
@@ -267,21 +271,23 @@ export class GameRoom {
                 }
             }
 
-            this.io.to(this.id).emit('state', {
-                players: this.players,
-                enemies: this.enemies,
-                pendingSpawns: this.pendingSpawns,
-                bullets: this.bullets,
-                events: [],
-                map: this.mapDirty ? this.map : null,
-                bases: this.teamManager.getAllBases(),
-                settings: this.settings, 
-                botsSpawnedCount: this.botsSpawnedCount,
-                teamWins: this.teamWins,
-                isGameOver: this.isGameOver,
-                winnerTeamId: this.winnerTeamId,
-                bonus: this.activeBonus
-            });
+            if (this.io) {
+                this.io.to(this.id).emit('state', {
+                    players: this.players,
+                    enemies: this.enemies,
+                    pendingSpawns: this.pendingSpawns,
+                    bullets: this.bullets,
+                    events: [],
+                    map: this.mapDirty ? this.map : null,
+                    bases: this.teamManager.getAllBases(),
+                    settings: this.settings, 
+                    botsSpawnedCount: this.botsSpawnedCount,
+                    teamWins: this.teamWins,
+                    isGameOver: this.isGameOver,
+                    winnerTeamId: this.winnerTeamId,
+                    bonus: this.activeBonus
+                });
+            }
 
             return;
         }
@@ -582,7 +588,10 @@ export class GameRoom {
             this.settings.level = nextLevel;    
         }
 
-        this.io.to(this.id).emit('lobby_update', { settings: this.settings, players: this.players });
+        if (this.io) {
+            this.io.to(this.id).emit('lobby_update', { settings: this.settings, players: this.players });
+        }
+
         this.startGame();
     }
 
@@ -628,6 +637,8 @@ export class GameRoom {
     }
 
     broadcastState() {
+        if (!this.io) return;
+
         this.io.to(this.id).emit('state', {
             players: this.players,
             enemies: this.enemies,
@@ -680,7 +691,9 @@ export class GameRoom {
         if (this.chatHistory.length > CHAT_HISTORY_LENGTH) this.chatHistory.shift();
         
         // Шлем всем
-        this.io.to(this.id).emit('chat_update', msg);
+        if (this.io) {
+            this.io.to(this.id).emit('chat_update', msg);
+        }
     }
 
     async loadMap(levelName) {
@@ -697,5 +710,123 @@ export class GameRoom {
             this.rawMapData = Array(26).fill().map(() => Array(26).fill(0));
             this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
         }
+    }
+
+    applyAction(playerId, action) {
+        const player = this.players[playerId];
+        if (!player) return;
+
+        // Сбрасываем инпуты
+        const inputs = { up: false, down: false, left: false, right: false, fire: false, cheat0: false };
+
+        if (action === 1) inputs.up = true;
+        if (action === 2) inputs.down = true;
+        if (action === 3) inputs.left = true;
+        if (action === 4) inputs.right = true;
+        if (action === 5) inputs.fire = true;
+
+        player.inputs = inputs;
+    }
+
+/**
+     * Формирует "Зрение" для нейросети.
+     * Формат: 6 каналов x 26 строк x 26 колонок
+     */
+    getGameStateMatrix(agentId) {
+        const ROWS = 26;
+        const COLS = 26;
+        const CHANNELS = 6; // Было 5, стало 6
+        
+        const buffer = new Float32Array(CHANNELS * ROWS * COLS); 
+
+        // Хелпер для записи
+        const set = (ch, r, c, val) => {
+            if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                const index = (ch * ROWS * COLS) + (r * COLS) + c;
+                buffer[index] = val;
+            }
+        };
+
+        // --- КАНАЛ 0: КАРТА ---
+        if (this.map) {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const block = this.map[r][c];
+                    if (block) {
+                        if (block.type === 1) set(0, r, c, 0.5); // Кирпич
+                        if (block.type === 2) set(0, r, c, 1.0); // Бетон
+                        if (block.type === 4) set(0, r, c, -0.5); // Вода
+                    }
+                }
+            }
+        }
+
+        // Хелпер координат
+        const toGrid = (val) => Math.floor((val + 8) / TILE_SIZE); 
+
+        // --- СУЩНОСТИ ---
+        const me = this.players[agentId];
+        
+        // Все танки (игроки + боты)
+        const allTanks = [...Object.values(this.players), ...this.enemies];
+
+        allTanks.forEach(tank => {
+            if (tank.isDead) return;
+            const r = toGrid(tank.y);
+            const c = toGrid(tank.x);
+
+            if (tank.id === agentId) {
+                // КАНАЛ 1: ЭТО Я
+                set(1, r, c, 1.0); 
+            } else if (me) {
+                if (tank.team !== me.team) {
+                    // КАНАЛ 2: ВРАГИ
+                    set(2, r, c, 1.0);
+                } else {
+                    // КАНАЛ 5: СОЮЗНИКИ (Teammates)
+                    // Это танк моей команды, но не я сам
+                    set(5, r, c, 1.0);
+                }
+            }
+        });
+
+        // --- КАНАЛ 3: ПУЛИ ---
+        this.bullets.forEach(b => {
+            if (b.isDead) return;
+            const r = toGrid(b.y);
+            const c = toGrid(b.x);
+            
+            if (me && b.team !== me.team) {
+                set(3, r, c, 1.0); // Опасная пуля
+            } else {
+                set(3, r, c, -0.5); // Своя/Союзная пуля (информативно)
+            }
+        });
+
+        // --- КАНАЛ 4: БАЗА ---
+        const bases = this.teamManager.getAllBases();
+        bases.forEach(base => {
+            if (base.isDead) return;
+            const r = Math.floor(base.y / TILE_SIZE);
+            const c = Math.floor(base.x / TILE_SIZE);
+            
+            if (me) {
+                if (base.team === me.team) {
+                    // КАНАЛ 4: НАША БАЗА (Defend)
+                    set(4, r, c, 1.0);
+                    set(4, r+1, c, 1.0);
+                    set(4, r, c+1, 1.0);
+                    set(4, r+1, c+1, 1.0);
+                } else {
+                    // КАНАЛ 6: ВРАЖЕСКАЯ БАЗА (Attack)
+                    set(6, r, c, 1.0);
+                    set(6, r+1, c, 1.0);
+                    set(6, r, c+1, 1.0);
+                    set(6, r+1, c+1, 1.0);
+                }
+            }
+        });
+
+        return buffer;
     }
 }
