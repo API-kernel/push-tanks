@@ -5,6 +5,7 @@ export class TeamManager {
     constructor() {
         this.teams = {};
         this.basesEnabled = true;
+        this.useConcreteLid = false; 
 
         TEAMS_CONFIG.forEach(cfg => {
             this.teams[cfg.id] = {
@@ -23,6 +24,10 @@ export class TeamManager {
         });
     }
     
+    setConcreteLid(enabled) {
+        this.useConcreteLid = enabled;
+    }
+
     setBasesEnabled(enabled) {
         this.basesEnabled = enabled;
     }
@@ -64,12 +69,26 @@ export class TeamManager {
         if (!team || !team.baseAlive) return;
 
         const walls = BASE_WALLS[teamId];
-        const newType = isSteel ? 2 : 1; 
+        const baseType = isSteel ? 2 : 1; 
 
         walls.forEach(w => {
             if (map[w.r] && map[w.r][w.c] !== undefined) {
+                
+                let typeToSet = baseType;
+
+                if (!isSteel && this.useConcreteLid) {
+                    const isCenter = (w.c === 12 || w.c === 13);
+                    
+                    // Для Зеленых (1) ряд 23, для Красных (2) ряд 2
+                    const isLidRow = (teamId === 1 && w.r === 23) || (teamId === 2 && w.r === 2);
+
+                    if (isCenter && isLidRow) {
+                        typeToSet = 2; // Принудительно Бетон
+                    }
+                }
+
                 map[w.r][w.c] = {
-                    type: newType,
+                    type: typeToSet,
                     mask: BLOCK_FULL,
                     isBaseWall: true
                 };

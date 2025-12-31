@@ -5,6 +5,7 @@ export function createLevel(rawMapData, basesEnabled) {
     if (!rawMapData) return [];
 
     const map = [];
+    let hasConcreteBlocker = false;
 
     for (let r = 0; r < rawMapData.length; r++) {
         const row = [];
@@ -48,8 +49,6 @@ export function createLevel(rawMapData, basesEnabled) {
         // АВТО-УКРЕПЛЕНИЕ (Line of Sight)
         const checkCols = [12, 13]; // Центральные колонки
 
-        let hasConcreteBlocker = false;
-
         // Сканируем пространство МЕЖДУ базами (исключая сами базы)
         // Ряды от 4 до 21 (примерно)
         for (let r = 4; r <= 21; r++) {
@@ -79,6 +78,8 @@ export function createLevel(rawMapData, basesEnabled) {
         }
     }
 
+    teamManager.setConcreteLid(!hasConcreteBlocker);
+    
     return map;
 }
 
