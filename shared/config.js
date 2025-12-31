@@ -17,7 +17,6 @@ export const CANVAS_HEIGHT = MAP_HEIGHT + PADDING * 2;
 export const SPAWN_COLUMNS = [8, 16, 0, 24];
 export const ENABLE_CHEATS = true; 
 
-// Просто массив настроек.
 export const TEAMS_CONFIG = [
     {
         id: 1,
@@ -61,9 +60,9 @@ export const TANK_STATS = {
 };
 
 export const BONUS_WEIGHTS = {
-    'star': 25,
+    'star': 30,
     'grenade': 10,
-    'clock': 15,
+    'clock': 10,
     'helmet': 15,
     'tank': 20,
     'gun': 1,

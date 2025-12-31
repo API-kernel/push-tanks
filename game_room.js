@@ -350,24 +350,34 @@ export class GameRoom {
         this.battleSystem.update();
 
         // --- МИГАНИЕ СТЕН (Лопата заканчивается) ---
-        [1, 2].forEach(teamId => {
-            if (this.effectTimers.shovels[teamId] > 0) {
-                this.effectTimers.shovels[teamId]--;
-                const timer = this.effectTimers.shovels[teamId];
+        TEAMS_CONFIG.forEach(team => {
+            if (this.effectTimers.shovels[team.id] > 0) {
+                this.effectTimers.shovels[team.id]--;
+                const timer = this.effectTimers.shovels[team.id];
+                
+                // Интервал мигания (0.5 сек)
+                const flashInterval = Math.floor(SERVER_FPS / 2); // 30 тиков
 
-                // Мигание (последние 3 секунды), но строго пока таймер > 0
+                // Мигаем последние 3 секунды
                 if (timer < 3 * SERVER_FPS && timer > 0) {
-                    if (timer % (SERVER_FPS / 2) === 0) {
-                        const phase = Math.floor(timer / SERVER_FPS / 2) % 2;
+                    
+                    // Заходим сюда каждые 0.5 сек
+                    if (timer % flashInterval === 0) {
+                        
+                        // ИСПРАВЛЕНИЕ МАТЕМАТИКИ:
+                        // Делим текущее время на интервал, чтобы получить номер такта (1, 2, 3...)
+                        // И берем остаток от деления на 2, чтобы получить 0 или 1.
+                        
+                        const phase = Math.floor(timer / flashInterval) % 2;
+                        
                         const isSteel = (phase === 0);
-                        this.teamManager.fortifyBase(teamId, isSteel, this.map);
+                        this.teamManager.fortifyBase(team.id, isSteel, this.map);
                         this.mapDirty = true;
                     }
                 }
                 
-                // Время вышло - возвращаем кирпич
                 if (timer === 0) {
-                    this.teamManager.fortifyBase(teamId, false, this.map);
+                    this.teamManager.fortifyBase(team.id, false, this.map);
                     this.mapDirty = true;
                 }
             }
