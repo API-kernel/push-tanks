@@ -65,6 +65,17 @@ export class InputHandler {
         return this.keys['Tab'] || gp1.tab || gp2.tab;
     }
 
+    isPauseRequested() {
+        const gp1 = this.getGamepadState(0);
+        const gp2 = this.getGamepadState(1);
+        
+        // Проверяем:
+        // 1. Клавишу P
+        // 2. Кнопку Start на геймпаде 1
+        // 3. Кнопку Start на геймпаде 2
+        return this.keys['KeyP'] || gp1.start || gp2.start;
+    }
+
     // Внутренние хелперы (чтобы не дублировать код чтения клавиш)
     _getKbP1() {
         return {

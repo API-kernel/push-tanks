@@ -92,14 +92,6 @@ socket.on('lobby_update', (data) => {
     if (window.updateLobbyList) window.updateLobbyList(data.players);
 });
 
-
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyP') {
-        socket.emit('toggle_pause');
-    }
-});
-
-
 let gameStartTime = 0;
 socket.on('game_start', () => {
     console.log("Game Started!");
@@ -292,7 +284,19 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
+let prevPauseState = false;
+
 function update() {
+    const isPauseDown = game.input.isPauseRequested();
+
+    // 2. Если нажата СЕЙЧАС, но НЕ была нажата в ПРОШЛОМ кадре (момент нажатия)
+    if (isPauseDown && !prevPauseState) {
+        socket.emit('toggle_pause');
+    }
+
+    // 3. Запоминаем для следующего кадра
+    prevPauseState = isPauseDown;
+
     const p2Id = `${myId}_1`;
     const p2Exists = serverState.players && serverState.players[p2Id];
 
@@ -300,7 +304,6 @@ function update() {
     socket.emit('input', inputs);
 
     game.showNames = game.input.isShowNamesPressed() || (Date.now() - gameStartTime < 5000);
-
 
     updateExplosions();
 }
