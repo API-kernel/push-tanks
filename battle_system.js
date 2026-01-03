@@ -61,7 +61,7 @@ export class BattleSystem {
                         
                         // Щит
                         if (tank.shieldTimer > 0) {
-                            this.room.bulletEvents.push({ type: 'SHIELD_HIT', x: tank.x, y: tank.y });
+                            this.room.bulletEvents.push({ type: 'SHIELD_HIT', x: tank.x, y: tank.y, ownerId: b.ownerId });
                             break; 
                         }
 
@@ -95,7 +95,7 @@ export class BattleSystem {
                         }
 
                         if (isDead) {
-                            this.room.bulletEvents.push({ type: 'TANK_EXPLODE', x: tank.x, y: tank.y, isPlayer: !!tank.inputs });
+                            this.room.bulletEvents.push({ type: 'TANK_EXPLODE', x: tank.x, y: tank.y, isPlayer: !!tank.inputs, ownerId: b.ownerId });
                             
                             // Если умер Игрок - ставим таймер
                             if (tank.inputs) {
@@ -112,7 +112,7 @@ export class BattleSystem {
 
                         } else {
                             // Броня
-                            this.room.bulletEvents.push({ type: 'ARMOR_HIT', x: tank.x, y: tank.y });
+                            this.room.bulletEvents.push({ type: 'ARMOR_HIT', x: tank.x, y: tank.y, ownerId: b.ownerId });
                         }
                         break;
                     }

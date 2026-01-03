@@ -728,103 +728,149 @@ export class GameRoom {
         player.inputs = inputs;
     }
 
-/**
-     * Формирует "Зрение" для нейросети.
-     * Формат: 6 каналов x 26 строк x 26 колонок
+    /**
+     * FINAL ARCHITECTURE (5 Channels)
+     * Сетка: 26x26.
+     * Ch 0: Карта (Стены, Вода, Лес, Лед, Бонусы).
+     * Ch 1: Сущности (Базы +/-1.0, Танки: Я 0.6..1.0, Союзник 0.33, Враг -1.0).
+     * Ch 2: Вектор X (Направление * ФакторДвижения).
+     * Ch 3: Вектор Y (Направление * ФакторДвижения).
+     * Ch 4: Пули (Сглаженные).
      */
     getGameStateMatrix(agentId) {
         const ROWS = 26;
         const COLS = 26;
-        const CHANNELS = 6; // Было 5, стало 6
+        const CHANNELS = 5; 
         
         const buffer = new Float32Array(CHANNELS * ROWS * COLS); 
 
-        // Хелпер для записи
+        // ... (set, addInterpolated, getDirVec, toGrid, fill2x2 - без изменений) ...
         const set = (ch, r, c, val) => {
             if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
                 const index = (ch * ROWS * COLS) + (r * COLS) + c;
                 buffer[index] = val;
             }
         };
+        const toGrid = (val) => Math.floor(val / TILE_SIZE); 
+        const fill2x2 = (ch, r, c, val) => {
+            set(ch, r, c, val);     set(ch, r+1, c, val);
+            set(ch, r, c+1, val);   set(ch, r+1, c+1, val);
+        };
+        const getDirVec = (dir) => {
+            if (dir === 'UP')    return [0, -1];
+            if (dir === 'DOWN')  return [0, 1];
+            if (dir === 'LEFT')  return [-1, 0];
+            if (dir === 'RIGHT') return [1, 0];
+            return [0, 0];
+        };
+        
+        // --- Ch 4: ПУЛИ (Anti-Aliasing) ---
+        // Объявляем addInterpolated здесь или используем из замыкания
+        const addInterpolated = (ch, x, y, val) => {
+            const gx = x / TILE_SIZE; 
+            const gy = y / TILE_SIZE;
+            const c0 = Math.floor(gx);
+            const r0 = Math.floor(gy);
+            const fx = gx - c0; 
+            const fy = gy - r0; 
+            const wLeft = 1.0 - fx; const wRight = fx;
+            const wTop = 1.0 - fy; const wBottom = fy;
+            const add = (r, c, w) => {
+                if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                    const idx = (ch * ROWS * COLS) + (r * COLS) + c;
+                    buffer[idx] += val * w;
+                }
+            };
+            add(r0, c0, wTop * wLeft); add(r0, c0 + 1, wTop * wRight);    
+            add(r0 + 1, c0, wBottom * wLeft); add(r0 + 1, c0 + 1, wBottom * wRight); 
+        };
 
-        // --- КАНАЛ 0: КАРТА ---
+        // --- Ch 0: КАРТА (Значения -1..1) ---
         if (this.map) {
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const block = this.map[r][c];
                     if (block) {
-                        if (block.type === 1) set(0, r, c, 0.5); // Кирпич
-                        if (block.type === 2) set(0, r, c, 1.0); // Бетон
-                        if (block.type === 4) set(0, r, c, -0.5); // Вода
+                        if (block.type === 1) set(0, r, c, 0.5);   // Кирпич
+                        if (block.type === 2) set(0, r, c, 1.0);   // Бетон
+                        if (block.type === 4) set(0, r, c, -1.0);  // Вода
+                        if (block.type === 5) set(0, r, c, 0.2);   // Лед
+                        if (block.type === 3) set(0, r, c, -0.5);  // Лес
                     }
                 }
             }
         }
 
-        // Хелпер координат
-        const toGrid = (val) => Math.floor((val + 8) / TILE_SIZE); 
-
-        // --- СУЩНОСТИ ---
         const me = this.players[agentId];
-        
-        // Все танки (игроки + боты)
-        const allTanks = [...Object.values(this.players), ...this.enemies];
 
-        allTanks.forEach(tank => {
-            if (tank.isDead) return;
-            const r = toGrid(tank.y);
-            const c = toGrid(tank.x);
-
-            if (tank.id === agentId) {
-                // КАНАЛ 1: ЭТО Я
-                set(1, r, c, 1.0); 
-            } else if (me) {
-                if (tank.team !== me.team) {
-                    // КАНАЛ 2: ВРАГИ
-                    set(2, r, c, 1.0);
-                } else {
-                    // КАНАЛ 5: СОЮЗНИКИ (Teammates)
-                    // Это танк моей команды, но не я сам
-                    set(5, r, c, 1.0);
-                }
-            }
-        });
-
-        // --- КАНАЛ 3: ПУЛИ ---
-        this.bullets.forEach(b => {
-            if (b.isDead) return;
-            const r = toGrid(b.y);
-            const c = toGrid(b.x);
-            
-            if (me && b.team !== me.team) {
-                set(3, r, c, 1.0); // Опасная пуля
-            } else {
-                set(3, r, c, -0.5); // Своя/Союзная пуля (информативно)
-            }
-        });
-
-        // --- КАНАЛ 4: БАЗА ---
+        // --- Ch 1: СУЩНОСТИ (БАЗЫ) ---
         const bases = this.teamManager.getAllBases();
         bases.forEach(base => {
             if (base.isDead) return;
             const r = Math.floor(base.y / TILE_SIZE);
             const c = Math.floor(base.x / TILE_SIZE);
             
-            if (me) {
-                if (base.team === me.team) {
-                    // КАНАЛ 4: НАША БАЗА (Defend)
-                    set(4, r, c, 1.0);
-                    set(4, r+1, c, 1.0);
-                    set(4, r, c+1, 1.0);
-                    set(4, r+1, c+1, 1.0);
+            // НОРМАЛИЗАЦИЯ: Моя = -1.0, Враг = 1.0
+            const val = (me && base.team === me.team) ? -1.0 : 1.0;
+            fill2x2(1, r, c, val);
+        });
+
+        // --- Ch 1, 2, 3: ТАНКИ ---
+        const allTanks = [...Object.values(this.players), ...this.enemies];
+        allTanks.forEach(tank => {
+            if (tank.isDead) return;
+            
+            const r = toGrid(tank.y);
+            const c = toGrid(tank.x);
+            const [dx, dy] = getDirVec(tank.direction);
+            const moveFactor = tank.isMoving ? 1.0 : 0.5;
+
+            // Расчет значения тела (Ch 1)
+            let bodyValue = 0;
+
+            if (tank.id === agentId) {
+                // Я: 0.6 (Заряжаюсь) ... 1.0 (Готов) -> Нормализуем к 0.6
+                // Давай сделаем Я = 0.6. А зарядка влияет на цвет?
+                // Нет, мы договорились: Тело = Идентификация, Вектор = Движение.
+                // Перезарядку лучше в Ch 1 закодировать яркостью "СЕБЯ".
+                
+                let charge = 1.0;
+                if (tank.bulletCooldown > 0) {
+                    const maxCD = 60.0;
+                    charge = 1.0 - Math.min(tank.bulletCooldown / maxCD, 1.0); 
+                }
+                // Диапазон: 0.3 (пуст) ... 0.6 (готов)
+                // Чтобы не перепутать с врагом (-0.6) и союзником (0.3)
+                // Пусть будет: 0.4 ... 0.8
+                bodyValue = 0.4 + (charge * 0.4); 
+
+            } else if (me) {
+                if (tank.team === me.team) {
+                    bodyValue = 0.3; // СОЮЗНИК
                 } else {
-                    // КАНАЛ 6: ВРАЖЕСКАЯ БАЗА (Attack)
-                    set(6, r, c, 1.0);
-                    set(6, r+1, c, 1.0);
-                    set(6, r, c+1, 1.0);
-                    set(6, r+1, c+1, 1.0);
+                    bodyValue = -0.6; // ВРАГ
                 }
             }
+
+            // Ch 1: Тело
+            fill2x2(1, r, c, bodyValue);
+
+            // Ch 2, 3: Векторы (-1..1)
+            fill2x2(2, r, c, dx * moveFactor); 
+            fill2x2(3, r, c, dy * moveFactor); 
+        });
+
+        // --- Ch 4: ПУЛИ ---
+        this.bullets.forEach(b => {
+            if (b.isDead) return;
+            const cx = b.x + 2; 
+            const cy = b.y + 2;
+            
+            let val = 0.5; // Моя
+            if (me && b.team !== me.team) {
+                val = 1.0; // Вражеская (Макс опасность)
+            }
+            addInterpolated(4, cx, cy, val);
         });
 
         return buffer;

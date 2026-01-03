@@ -1,2 +1,5 @@
 ﻿project_context.txt
 .env
+models/*
+__pycache__
+logs
