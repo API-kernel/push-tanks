@@ -1,0 +1,5 @@
+{
+  "shared/ai/tactical-v1.js": "d2098926505ab7aba45b12f4d144abbea2e20cc5249809b14a8e10a24ebd323a",
+  "shared/ai/navigation.js": "0e5fd5eef5733005144b15b0f8c25322afc9f1dcbea96c6b44fe55725cf6be4a",
+  "shared/ai/geometry.js": "133a6bb077746860a0d763c01eb5aa0cf64338fb692ea8d82ad78e3d84bdb633"
+}

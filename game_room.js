@@ -5,15 +5,28 @@ import { updateTankMovement } from './shared/tank.js';
 import { TeamManager } from './shared/team_manager.js';
 import { checkRectOverlap } from './shared/utils.js';
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SERVER_FPS, CHAT_HISTORY_LENGTH,
-     SHIELD_DURATION, SPAWN_ANIMATION_DURATION, TEAMS_CONFIG, SPAWN_COLUMNS } from './shared/config.js';
+     SHIELD_DURATION, SPAWN_ANIMATION_DURATION, TEAMS_CONFIG, SPAWN_COLUMNS, RESPAWN_DELAY } from './shared/config.js';
 import { spawnBonus, checkBonusCollection } from './shared/bonus.js';
 import { HELMET_DURATION, SHOVEL_DURATION, CLOCK_DURATION, TANK_STATS, ENABLE_CHEATS } from './shared/config.js';
 import { BattleSystem } from './battle_system.js';
 import fs from 'fs/promises';
+import { seededRandom } from './shared/random.js';
+import { BOT_POLICIES, DEFAULT_BOT_VERSION } from './shared/ai/versions.js';
 
 export class GameRoom {
-    constructor(roomId, io = null, mapList = []) {
+    constructor(roomId, io = null, mapList = [], options = {}) {
         this.id = roomId;
+        this.silent = options.silent || false;
+        this.random = options.seed === undefined ? Math.random : seededRandom(options.seed);
+        this.teamRandom = {
+            1: options.seed === undefined ? Math.random : seededRandom(options.seed ^ 0x12345678),
+            2: options.seed === undefined ? Math.random : seededRandom(options.seed ^ 0x87654321)
+        };
+        this.spawnRandom = {
+            1: options.seed === undefined ? Math.random : seededRandom(options.seed ^ 0xABC12345),
+            2: options.seed === undefined ? Math.random : seededRandom(options.seed ^ 0xDEF54321)
+        };
+        this.botAIs = Object.fromEntries(Object.entries(BOT_POLICIES).map(([version, Policy]) => [version, new Policy(this)]));
         this.io = io;
         this.mapList = mapList;
 
@@ -45,6 +58,7 @@ export class GameRoom {
 
         this.settings = {
             level: 1,
+            botVersion: DEFAULT_BOT_VERSION,
             basesEnabled: true, 
             autoNextLevel: false,
             vibraniumBase: true,
@@ -60,6 +74,8 @@ export class GameRoom {
         this.resetGame();
 
     }
+
+    get botAI() { return this.botAIs[this.settings.botVersion] || this.botAIs[DEFAULT_BOT_VERSION]; }
 
     addPlayer(socketId, localIndex, nickname) {
         const uniqueId = `${socketId}_${localIndex}`;
@@ -282,6 +298,7 @@ export class GameRoom {
                     bases: this.teamManager.getAllBases(),
                     settings: this.settings, 
                     botsSpawnedCount: this.botsSpawnedCount,
+                    bonusReserves: this.bonusReserves,
                     teamWins: this.teamWins,
                     isGameOver: this.isGameOver,
                     winnerTeamId: this.winnerTeamId,
@@ -297,6 +314,8 @@ export class GameRoom {
             this.mapDirty = true;
         }
 
+        this.bulletEvents = [];
+
         // --- ЛОГИКА ПОБЕДЫ (Симметричная) ---
         const teams = this.teamManager.getTeams();
         
@@ -307,7 +326,7 @@ export class GameRoom {
             const teamId = team.id;
             
             // 1. Резерв
-            const reserve = (this.settings.botsReserve[teamId] || 0) - (this.botsSpawnedCount[teamId] || 0);
+            const reserve = (this.settings.botsReserve[teamId] || 0) + this.bonusReserves[teamId] - (this.botsSpawnedCount[teamId] || 0);
             
             // 2. Активные боты
             const activeBots = this.enemies.filter(e => e.team === teamId).length + 
@@ -328,8 +347,6 @@ export class GameRoom {
             return;
         }
 
-        this.bulletEvents = [];
-
         // 1. ИГРОКИ
         for (const id in this.players) {
             if (this.players[id].team !== 0) {
@@ -346,7 +363,7 @@ export class GameRoom {
         updateEnemies(this);
 
         // 3. ПУЛИ
-        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager, this.settings.vibraniumBase);
+        const bEvents = updateBullets(this.bullets, this.map, MAP_WIDTH, MAP_HEIGHT, this.teamManager, this.settings.vibraniumBase, this.random);
         this.bulletEvents.push(...bEvents);
         if (bEvents.some(e => e.type === 'HIT')) {
             this.mapDirty = true;
@@ -418,7 +435,7 @@ export class GameRoom {
             if (p.cheatCooldown > 0) p.cheatCooldown--;
             if (p.inputs.cheat0 && p.cheatCooldown <= 0) {
                 const bases = this.teamManager.getAllBases();
-                this.activeBonus = spawnBonus(this.map, bases, p.x, p.y - 32); 
+                this.activeBonus = spawnBonus(this.map, bases, p.x, p.y - 32, this.random);
                 if(this.activeBonus) this.bulletEvents.push({type: 'BONUS_SPAWN'});
                 p.cheatCooldown = SERVER_FPS / 2;
             }
@@ -465,8 +482,9 @@ export class GameRoom {
     }
 
     applyBonus(player, type) {
-        this.bulletEvents.push({ type: 'BONUS_TAKEN' });
-        this.sendSystemMessage(`${player.nickname || 'Player'} picked up ${type.toUpperCase()}`);
+        const isBot = typeof player.id === 'number';
+        this.bulletEvents.push({ type: 'BONUS_TAKEN', ownerId: player.id, team: player.team, bonusType: type });
+        this.sendSystemMessage(`${player.nickname || `Bot #${player.id}`} picked up ${type.toUpperCase()}`);
 
         switch(type) {
             case 'helmet': player.shieldTimer = HELMET_DURATION; break;
@@ -482,26 +500,44 @@ export class GameRoom {
                 this.teamManager.fortifyBase(player.team, true, this.map); 
                 this.mapDirty = true; 
                 break;
-            case 'star': 
-                player.level++; 
-                if(player.level>4) 
-                    player.level=4; 
-                    player.hp = TANK_STATS.player.levels[player.level].hp; // Максимум
+            case 'star':
+                player.level = Math.min(4, (player.level || 1) + 1);
+                player.hp = Math.max(isBot ? player.baseHp : 1, TANK_STATS.player.levels[player.level].hp);
                 break;
             case 'gun': 
                 player.level = 4;
-                player.hp = TANK_STATS.player.levels[player.level].hp;
+                player.hp = Math.max(isBot ? player.baseHp : 1, TANK_STATS.player.levels[player.level].hp);
                 break;
             case 'grenade':
                 this.bulletEvents.push({ type: 'GRENADE_EXPLODE' });
                 for(let i = this.enemies.length-1; i>=0; i--) {
                     if(this.enemies[i].team !== player.team) {
-                        this.enemies[i].hp=0;
+                        const target = this.enemies[i];
+                        this.bulletEvents.push({ type: 'TANK_EXPLODE', ownerId: player.id, team: player.team, targetTeam: target.team, x: target.x, y: target.y, isPlayer: false });
+                        target.hp=0;
                         hitEnemy(this, i); 
                     }
                 }
+                for (const target of Object.values(this.players)) {
+                    if (target.team > 0 && target.team !== player.team && !target.isDead && !target.isSpawning) {
+                        this.bulletEvents.push({ type: 'TANK_EXPLODE', ownerId: player.id, team: player.team, targetTeam: target.team, x: target.x, y: target.y, isPlayer: true });
+                        target.isDead = true;
+                        target.lives--;
+                        target.respawnTimer = RESPAWN_DELAY;
+                        target.x = -1000;
+                    }
+                }
                 break;
-            case 'tank': player.lives++; this.bulletEvents.push({ type: 'LIFE_UP' }); break;
+            case 'tank':
+                if (isBot) this.bonusReserves[player.team]++;
+                else player.lives++;
+                this.bulletEvents.push({ type: 'LIFE_UP', team: player.team });
+                break;
+        }
+        if (isBot && (type === 'star' || type === 'gun')) {
+            const stats = TANK_STATS.player.levels[player.level];
+            player.bulletSpeed = Math.max(player.bulletSpeed, stats.bulletSpeed);
+            player.bulletCooldownMax = Math.min(player.bulletCooldownMax, stats.cooldown);
         }
     }
 
@@ -566,15 +602,15 @@ export class GameRoom {
         if (winnerTeamId) this.teamWins[winnerTeamId]++;
 
         const team = this.teamManager.getTeam(winnerTeamId);
-        this.sendSystemMessage(`${team.name} TEAM WINS!`);
-        console.log(`GAME OVER in room ${this.id}. Winner: Team ${winnerTeamId}`);
+        this.sendSystemMessage(team ? `${team.name} TEAM WINS!` : 'DRAW!');
+        if (!this.silent) console.log(`GAME OVER in room ${this.id}. Winner: Team ${winnerTeamId}`);
     }
 
     goToNextLevel() {
         let nextLevel = this.settings.level;
 
         if (this.mapList.length > 0) {
-            let nextIdx = Math.floor(Math.random() * this.mapList.length);
+            let nextIdx = Math.floor(this.random() * this.mapList.length);
             
             if (this.mapList.length > 1) {
                 const currentStr = String(this.settings.level);
@@ -605,10 +641,13 @@ export class GameRoom {
         this.gameOverTimer = 0;
         this.effectTimers = { shovels: { 1: 0, 2: 0 }, clock: 0, clockTeam: 0 };
         this.botsSpawnedCount = { 1: 0, 2: 0 };
+        this.bonusReserves = { 1: 0, 2: 0 };
+        this.teamSpawnTimers = {};
+        for (const controller of Object.values(this.botAIs)) controller.reset();
 
         this.teamManager = new TeamManager();
         this.teamManager.setBasesEnabled(this.settings.basesEnabled);
-        this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
+        this.map = createLevel(this.rawMapData, this.settings.basesEnabled, this.teamManager);
         this.mapDirty = true;
 
         for (const id in this.players) {
@@ -650,6 +689,7 @@ export class GameRoom {
             isPaused: this.isPaused,
             settings: this.settings, 
             botsSpawnedCount: this.botsSpawnedCount,
+            bonusReserves: this.bonusReserves,
             teamWins: this.teamWins,
             isGameOver: this.isGameOver,
             winnerTeamId: this.winnerTeamId,
@@ -703,12 +743,12 @@ export class GameRoom {
             const data = await fs.readFile(filePath, 'utf-8');
             this.rawMapData = JSON.parse(data);
             
-            this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
+            this.map = createLevel(this.rawMapData, this.settings.basesEnabled, this.teamManager);
             console.log(`Map ${levelName} loaded`);
         } catch (e) {
             console.error(`Failed to load map ${levelName}`, e);
             this.rawMapData = Array(26).fill().map(() => Array(26).fill(0));
-            this.map = createLevel(this.rawMapData, this.settings.basesEnabled);
+            this.map = createLevel(this.rawMapData, this.settings.basesEnabled, this.teamManager);
         }
     }
 

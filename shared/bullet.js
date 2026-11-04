@@ -42,7 +42,7 @@ export function createBullet(shooter, speed) {
     };
 }
 
-export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager, vibraniumEnabled) {
+export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManager, vibraniumEnabled, random = Math.random) {
     const events = [];
 
     for (let i = bulletsList.length - 1; i >= 0; i--) {
@@ -60,7 +60,7 @@ export function updateBullets(bulletsList, map, gameWidth, gameHeight, teamManag
 
         for (let s = 0; s < steps; s++) {
             // Проверка перед шагом
-            let collisionResult = checkCollisionAndDestroy(b, map, teamManager, vibraniumEnabled);
+            let collisionResult = checkCollisionAndDestroy(b, map, teamManager, vibraniumEnabled, random);
             if (collisionResult) {
                 if (collisionResult === 'VIBRANIUM_PING') {
                     b.isDead = true;
@@ -101,7 +101,7 @@ function checkRectIntersection(r1, r2) {
     return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
 }
 
-function checkCollisionAndDestroy(bullet, map, teamManager, vibraniumEnabled) {
+function checkCollisionAndDestroy(bullet, map, teamManager, vibraniumEnabled, random = Math.random) {
     if (bullet.isDead) return false;
 
     let hitDetected = false;
@@ -171,7 +171,7 @@ function checkCollisionAndDestroy(bullet, map, teamManager, vibraniumEnabled) {
     bullet.isDead = true;
 
     if (vibraniumEnabled && hitBlock && hitBlock.isBaseWall) {
-        if (Math.random() > 0.1) {
+        if (random() > 0.1) {
             return 'VIBRANIUM_PING'; 
         }
     }

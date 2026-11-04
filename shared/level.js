@@ -1,7 +1,7 @@
 import { TEAMS_CONFIG, TILE_SIZE } from './config.js';
 import { teamManager } from './team_manager.js';
 
-export function createLevel(rawMapData, basesEnabled) {
+export function createLevel(rawMapData, basesEnabled, manager = teamManager) {
     if (!rawMapData) return [];
 
     const map = [];
@@ -43,7 +43,7 @@ export function createLevel(rawMapData, basesEnabled) {
 
     if (basesEnabled) {
         TEAMS_CONFIG.forEach(team => {
-            teamManager.fortifyBase(team.id, false, map, true);
+            manager.fortifyBase(team.id, false, map, true);
         });
 
         // АВТО-УКРЕПЛЕНИЕ (Line of Sight)
@@ -78,7 +78,7 @@ export function createLevel(rawMapData, basesEnabled) {
         }
     }
 
-    teamManager.setConcreteLid(!hasConcreteBlocker);
+    manager.setConcreteLid(!hasConcreteBlocker);
     
     return map;
 }

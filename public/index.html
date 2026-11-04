@@ -80,6 +80,14 @@
                             <input type="number" id="opt-bots-red" min="0" max="100" value="" onchange="changeSettings()" disabled>
                         </label>
                         <label>
+                            BOT AI:
+                            <select id="opt-bot-ai" onchange="changeSettings()" disabled>
+                                <option value="tactical-v1">TACTICAL V1</option>
+                                <option value="tactical-v2">TACTICAL V2 (EXPERIMENTAL)</option>
+                                <option value="legacy">CLASSIC</option>
+                            </select>
+                        </label>
+                        <label>
                             INCLUDE BASES
                             <input type="checkbox" id="opt-bases" onchange="changeSettings()" disabled>
                         </label>

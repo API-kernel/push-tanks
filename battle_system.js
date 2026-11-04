@@ -42,7 +42,7 @@ export class BattleSystem {
 
                     teamManager.destroyBase(base.team);
                     
-                    this.room.bulletEvents.push({ type: 'BASE_DESTROY', x: base.x, y: base.y });
+                    this.room.bulletEvents.push({ type: 'BASE_DESTROY', ownerId: b.ownerId, team: b.team, targetTeam: base.team, x: base.x, y: base.y });
                     const winnerId = (base.team === 1) ? 2 : 1;
                     this.room.handleVictory(winnerId);
                 }
@@ -65,6 +65,7 @@ export class BattleSystem {
                             break; 
                         }
 
+                        this.room.bulletEvents.push({ type: 'TANK_HIT', ownerId: b.ownerId, team: b.team, targetTeam: tank.team });
                         let isDead = false;
                         let wasBonus = false;
 
@@ -95,7 +96,7 @@ export class BattleSystem {
                         }
 
                         if (isDead) {
-                            this.room.bulletEvents.push({ type: 'TANK_EXPLODE', x: tank.x, y: tank.y, isPlayer: !!tank.inputs });
+                            this.room.bulletEvents.push({ type: 'TANK_EXPLODE', ownerId: b.ownerId, team: b.team, targetTeam: tank.team, x: tank.x, y: tank.y, isPlayer: !!tank.inputs });
                             
                             // Если умер Игрок - ставим таймер
                             if (tank.inputs) {

@@ -28,6 +28,7 @@ window.changeSettings = () => {
     const bases = document.getElementById('opt-bases').checked;
     const autonext = document.getElementById('opt-autonext').checked;
     const vibranium = document.getElementById('opt-vibranium').checked;
+    const botVersion = document.getElementById('opt-bot-ai').value;
 
     if (window.tankGame) {
         window.tankGame.updateSettings({ 
@@ -36,6 +37,7 @@ window.changeSettings = () => {
             maxActiveTanks: maxActiveTanks,
             basesEnabled: bases,
             vibraniumBase: vibranium,
+            botVersion,
             autoNextLevel: autonext,
             botsReserve: { 1: botsGreen, 2: botsRed },
             allowHotJoin: hotjoin 
@@ -374,5 +376,6 @@ window.updateLobbyUI = (data) => {
         setVal('opt-bases', s.basesEnabled, true);
         setVal('opt-autonext', s.autoNextLevel, true);
         setVal('opt-vibranium', s.vibraniumBase, true);
+        setVal('opt-bot-ai', s.botVersion || 'tactical-v1');
     }
 };

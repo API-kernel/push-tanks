@@ -3,11 +3,11 @@ import { checkRectOverlap } from './utils.js';
 
 let activeBonus = null; // Объект { x, y, type }
 
-function getRandomBonusType() {
+function getRandomBonusType(rng = Math.random) {
     let totalWeight = 0;
     for (let key in BONUS_WEIGHTS) totalWeight += BONUS_WEIGHTS[key];
 
-    let random = Math.random() * totalWeight;
+    let random = rng() * totalWeight;
     for (let key in BONUS_WEIGHTS) {
         if (random < BONUS_WEIGHTS[key]) return key;
         random -= BONUS_WEIGHTS[key];
@@ -15,7 +15,7 @@ function getRandomBonusType() {
     return 'star';
 }
 
-export function spawnBonus(map, bases, x, y) {
+export function spawnBonus(map, bases, x, y, random = Math.random) {
     // Если координаты НЕ переданы (случайный спавн при убийстве бота)
     if (x === undefined || y === undefined) {
         const cols = Math.floor(MAP_WIDTH / TILE_SIZE) - 2;
@@ -27,8 +27,8 @@ export function spawnBonus(map, bases, x, y) {
         // Пытаемся 50 раз найти хорошее место
         while (!valid && attempts < 50) {
             // Генерируем случайную точку в сетке
-            x = (Math.floor(Math.random() * cols) + 1) * TILE_SIZE;
-            y = (Math.floor(Math.random() * rows) + 1) * TILE_SIZE;
+            x = (Math.floor(random() * cols) + 1) * TILE_SIZE;
+            y = (Math.floor(random() * rows) + 1) * TILE_SIZE;
 
             if (isValidBonusPosition(x, y, map, bases)) {
                 valid = true;
@@ -38,8 +38,8 @@ export function spawnBonus(map, bases, x, y) {
     }
 
     activeBonus = {
-        id: Date.now() + Math.random(), // Уникальный ID для звука
-        type: getRandomBonusType(),
+        id: Date.now() + random(), // Уникальный ID для звука
+        type: getRandomBonusType(random),
         x: x,
         y: y,
         width: 16, height: 16,
@@ -93,17 +93,17 @@ export function clearBonus() {
     activeBonus = null;
 }
 
-export function createRandomBonus(x, y) {
+export function createRandomBonus(x, y, random = Math.random) {
     if (x === undefined || y === undefined) {
         const cols = Math.floor(MAP_WIDTH / TILE_SIZE) - 2;
         const rows = Math.floor(MAP_HEIGHT / TILE_SIZE) - 2;
-        x = (Math.floor(Math.random() * cols) + 1) * TILE_SIZE;
-        y = (Math.floor(Math.random() * rows) + 1) * TILE_SIZE;
+        x = (Math.floor(random() * cols) + 1) * TILE_SIZE;
+        y = (Math.floor(random() * rows) + 1) * TILE_SIZE;
     }
 
     return {
-        id: Date.now() + Math.random(), // Уникальный ID
-        type: getRandomBonusType(),
+        id: Date.now() + random(), // Уникальный ID
+        type: getRandomBonusType(random),
         x: x,
         y: y,
         width: 16, height: 16,

@@ -1,8 +1,8 @@
-import { SPAWN_DELAY, TANK_STATS, MAP_WIDTH, MAP_HEIGHT, SERVER_FPS } from './config.js';
-import { createBullet } from './bullet.js';
+import { SPAWN_DELAY, TANK_STATS, SERVER_FPS } from './config.js';
 import { destroyBlockAt } from './level.js';
-import { updateTankMovement } from './tank.js';
-import { spawnBonus } from './bonus.js';
+import { spawnBonus, checkBonusCollection } from './bonus.js';
+import { updateLegacyBot } from './ai/legacy.js';
+import { botVersionFor } from './ai/versions.js';
 
 export function hitEnemy(room, index) {
     const enemy = room.enemies[index];
@@ -10,7 +10,7 @@ export function hitEnemy(room, index) {
 
     if (enemy.isBonus) {
         const bases = room.teamManager.getAllBases();
-        room.activeBonus = spawnBonus(room.map, bases); 
+        room.activeBonus = spawnBonus(room.map, bases, undefined, undefined, room.random);
         result.bonusDropped = true;
     }
 
@@ -24,11 +24,7 @@ export function hitEnemy(room, index) {
 
 // ГЛАВНАЯ ФУНКЦИЯ
 export function updateEnemies(room) {
-    const { map, teamManager, teamSpawnTimers, enemies, pendingSpawns, settings } = room;
-    // Достаем активных игроков для лимитов
-    const playerCounts = {};
-    teamManager.getTeams().forEach(t => playerCounts[t.id] = 0);
-    Object.values(room.players).forEach(p => { if(!p.isDead) playerCounts[p.team]++; });
+    const { teamManager, teamSpawnTimers, enemies, pendingSpawns, settings } = room;
 
     // Проверка часов
     const clockActiveTeam = (room.effectTimers.clock > 0) ? room.effectTimers.clockTeam : null;
@@ -40,7 +36,7 @@ export function updateEnemies(room) {
 
         // Считаем кол-во ботов этой команды
         const spawned = room.botsSpawnedCount[team.id] || 0;
-        const totalReserve = settings.botsReserve[team.id] || 0;
+        const totalReserve = (settings.botsReserve[team.id] || 0) + room.bonusReserves[team.id];
         
         // Если резерв исчерпан - не спавним
         if (spawned >= totalReserve) return;
@@ -56,7 +52,7 @@ export function updateEnemies(room) {
             if (teamSpawnTimers[team.id] > SPAWN_DELAY) {
                 // Собираем busyEntities для умного спавна
                 const busyEntities = [...Object.values(room.players), ...enemies, ...pendingSpawns];
-                const point = teamManager.getSpawnPoint(team.id, busyEntities);
+                const point = teamManager.getSpawnPoint(team.id, busyEntities, room.spawnRandom[team.id]);
                 
                 if (point) {
                     createSpawnAnimation(room, team.id, point.x, point.y);
@@ -85,33 +81,22 @@ export function updateEnemies(room) {
         }
     }
 
-    // 3. БОТЫ
-    const collisionFunc = room.checkGlobalCollision.bind(room);
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-
+    // Both policies use identical stats, spawning, physics and bonus effects.
+    const versions = new Set(enemies.map(b => botVersionFor(settings, b.team)));
+    for (const version of versions) room.botAIs[version]?.prepare();
+    for (const enemy of [...enemies]) {
+        if (!enemies.includes(enemy)) continue;
+        if (enemy.shieldTimer > 0) enemy.shieldTimer--;
         if (clockActiveTeam && enemy.team !== clockActiveTeam) continue;
-
-        if (!enemy.isMoving || Math.random() < 0.005) {
-            changeDirection(enemy);
+        const bonusType = checkBonusCollection(enemy, room.activeBonus);
+        if (bonusType) {
+            room.activeBonus = null;
+            room.applyBonus(enemy, bonusType);
         }
-
-        const moved = updateTankMovement(enemy, enemy.direction, MAP_WIDTH, MAP_HEIGHT, map, collisionFunc);
-        
-        if (!moved) {
-            if (Math.random() < 0.5) changeDirection(enemy);
-        }
-
         enemy.bulletTimer--;
-        if (enemy.bulletTimer <= 0) {
-            // Передаем список пуль комнаты и карту
-            const bullet = createBullet(enemy, enemy.bulletSpeed);
-            room.bullets.push(bullet);
-            room.bulletEvents.push({ type: 'ENEMY_FIRE', x: enemy.x, y: enemy.y }); // Опционально звук
-            const baseCD = enemy.bulletCooldownMax; 
-            enemy.bulletTimer = baseCD + Math.random() * (baseCD / 2); 
-        }
+        const version = botVersionFor(settings, enemy.team);
+        if (version === 'legacy') updateLegacyBot(room, enemy);
+        else room.botAIs[version].update(enemy);
     }
 }
 
@@ -122,7 +107,8 @@ function createSpawnAnimation(room, teamId, x, y) {
 function spawnTankFromStar(room, star) {
     destroyBlockAt(room.map, star.x, star.y);
 
-    const rand = Math.random();
+    const random = room.spawnRandom[star.team];
+    const rand = random();
     let type = 'basic';
     if (rand < 0.4) type = 'basic';     
     else if (rand < 0.6) type = 'fast'; 
@@ -134,7 +120,7 @@ function spawnTankFromStar(room, star) {
     const startDir = teamConfig ? teamConfig.direction : 'DOWN';
 
     // Шанс бонуса
-    const isBonus = Math.random() < 0.3;
+    const isBonus = random() < 0.3;
 
     room.enemies.push({
         id: room.enemyIdCounter++,
@@ -145,7 +131,10 @@ function spawnTankFromStar(room, star) {
         direction: startDir,
         speed: template.speed,
         hp: template.hp,
-        type: template.type,     
+        baseHp: template.hp,
+        level: 1,
+        shieldTimer: 0,
+        type,
         spriteKey: template.spriteKey,
         bulletLvl: template.bulletLvl,
         bulletSpeed: template.bulletSpeed,
@@ -154,19 +143,4 @@ function spawnTankFromStar(room, star) {
         bulletTimer: SERVER_FPS,
         isBonus: isBonus
     });
-}
-
-function changeDirection(enemy) {
-    const rand = Math.random();
-    // Предпочтение по команде
-    const isRed = (enemy.team === 2);
-    const forward = isRed ? 'DOWN' : 'UP';
-    
-    if (rand < 0.25) enemy.direction = forward;
-    else if (rand < 0.5) enemy.direction = (forward === 'UP') ? 'DOWN' : 'UP';
-    else if (rand < 0.75) enemy.direction = 'LEFT';
-    else enemy.direction = 'RIGHT'; 
-
-    enemy.x = Math.round(enemy.x);
-    enemy.y = Math.round(enemy.y);
 }

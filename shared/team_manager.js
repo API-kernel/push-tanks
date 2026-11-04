@@ -96,7 +96,7 @@ export class TeamManager {
         });
     }
 
-    getSpawnPoint(teamId, busyEntities = []) {
+    getSpawnPoint(teamId, busyEntities = [], random = Math.random) {
         const team = this.teams[teamId];
         if (!team) return null;
 
@@ -114,9 +114,9 @@ export class TeamManager {
         });
 
         if (freePoints.length > 0) {
-            return freePoints[Math.floor(Math.random() * freePoints.length)];
+            return freePoints[Math.floor(random() * freePoints.length)];
         }
-        return possiblePoints[Math.floor(Math.random() * possiblePoints.length)];
+        return possiblePoints[Math.floor(random() * possiblePoints.length)];
     }
 }
 

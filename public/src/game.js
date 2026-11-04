@@ -38,6 +38,7 @@ let serverState = {
     isGameOver: false,
     settings: { level: 1, botsReserve: {1:20, 2:20} },
     botsSpawnedCount: { 1: 0, 2: 0 },
+    bonusReserves: { 1: 0, 2: 0 },
     teamWins: { 1: 0, 2: 0 } 
 };
 
@@ -176,6 +177,7 @@ socket.on('state', (state) => {
 
     if (state.settings) serverState.settings = state.settings;
     if (state.botsSpawnedCount) serverState.botsSpawnedCount = state.botsSpawnedCount;
+    if (state.bonusReserves) serverState.bonusReserves = state.bonusReserves;
     if (state.teamWins) serverState.teamWins = state.teamWins;
 
     serverState.bonus = state.bonus;
@@ -365,6 +367,7 @@ function draw() {
         pendingSpawns: serverState.pendingSpawns,
         settings: serverState.settings,
         botsSpawnedCount: serverState.botsSpawnedCount,
+        bonusReserves: serverState.bonusReserves,
         myTeam: myTeam,
         myId: myId
     };

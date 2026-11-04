@@ -180,6 +180,13 @@ export function drawEnemies(ctx, spritesImage, enemies, pendingSpawns) {
                     );
                 }
             }
+            if (enemy.shieldTimer > 0) {
+                const frame = SPRITES.shield[Math.floor(Date.now() / 50) % 2];
+                if (frame) {
+                    const [sx, sy, sw, sh] = frame;
+                    ctx.drawImage(spritesImage, sx, sy, sw, sh, Math.round(enemy.x), Math.round(enemy.y), TILE_BIG_SIZE, TILE_BIG_SIZE);
+                }
+            }
         });
     }
 }

@@ -14,7 +14,7 @@ function drawNumber(ctx, spritesImage, number, x, y) {
 }
 
 export function drawHUD(ctx, spritesImage, data) {
-    const { players, enemies, pendingSpawns, settings, botsSpawnedCount, myTeam, myId } = data;
+    const { players, enemies, pendingSpawns, settings, botsSpawnedCount, bonusReserves = {}, myTeam, myId } = data;
     
     const startX = MAP_WIDTH + PADDING + 4; 
     let cursorY = PADDING + 24; 
@@ -23,7 +23,7 @@ export function drawHUD(ctx, spritesImage, data) {
     const enemyTeamId = (myTeam === 1) ? 2 : 1; 
     const enemyPlayersCount = Object.values(players).filter(p => p.team === enemyTeamId && p.lives >= 0).length;
     
-    const reserveTotal = (settings.botsReserve && settings.botsReserve[enemyTeamId]) || 0;
+    const reserveTotal = ((settings.botsReserve && settings.botsReserve[enemyTeamId]) || 0) + (bonusReserves[enemyTeamId] || 0);
     const spawnedAlready = (botsSpawnedCount && botsSpawnedCount[enemyTeamId]) || 0;
     const reserveLeft = Math.max(0, reserveTotal - spawnedAlready);
     
