@@ -12,10 +12,10 @@ export function baseLaneTimingV6(room, tank, base, position = tank) {
         const solution = shotAt(room, shooter, direction, base);
         if (!solution) continue;
         const bullet = createBullet({ ...shooter, direction }, timing.bulletSpeed), [dx, dy] = DIRECTIONS[direction];
-        const planes = new Map();
+        const planes = new Map(), rect = { ...bullet };
         let blocked = false;
         for (let d = 0; d <= solution.distance; d += 2) {
-            const rect = { ...bullet, x: bullet.x + dx * d, y: bullet.y + dy * d };
+            rect.x = bullet.x + dx * d; rect.y = bullet.y + dy * d;
             for (let r = Math.floor(rect.y / 8); r <= Math.floor((rect.y + 3.999) / 8); r++) {
                 for (let c = Math.floor(rect.x / 8); c <= Math.floor((rect.x + 3.999) / 8); c++) {
                     const cell = room.map[r]?.[c];
@@ -60,7 +60,7 @@ export function estimateBaseThreatV6(room, target, base, field) {
         for (const y of [base.y - 8, base.y]) if (y >= 0 && y <= 192) candidates.set(`${coordinate}:${y}`, { x: coordinate, y });
     }
     for (const p of candidates.values()) {
-        const arrival = field.at(p).ticks;
+        const arrival = field.ticksAt ? field.ticksAt(p) : field.at(p).ticks;
         if (!Number.isFinite(arrival) || (best && frozen + arrival >= best.fatalTicks)) continue;
         const candidate = consider(p, arrival);
         if (candidate && (!best || candidate.fatalTicks < best.fatalTicks)) best = candidate;
@@ -129,7 +129,7 @@ export function withObjectiveTimingV6(Base, { enabled = true, horizon = 160 } = 
                             if (!clearPointV6(room, bot, point) || points.some(p => distance(p, point) < 16)) continue;
                             if (all.some(t => t.id !== bot.id && t.team === bot.team
                                 && Math.abs(t.x - point.x) < 14 && Math.abs(t.y - point.y) < 14)) continue;
-                            const route = field.at(point), remainingFlight = distance(point, home) / weaponTiming(threat.target).bulletSpeed;
+                            const route = { ticks: field.ticksAt(point) }, remainingFlight = distance(point, home) / weaponTiming(threat.target).bulletSpeed;
                             const deadline = threat.fatalTicks - remainingFlight;
                             if (route.ticks > deadline + 4) continue;
                             // A shot available before shield expiry/fatal fire
