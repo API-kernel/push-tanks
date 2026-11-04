@@ -33,8 +33,10 @@ export async function runAblation({ candidates, reference = 'tactical-v5', oppon
             labels.push({ arm: 'candidate', version, cellId: task.cellId });
         }
     }
-    const hash = await sourceHash();
-    const runnerHash = createHash('sha256').update(await readFile(new URL('./ai-ablation.js', import.meta.url))).digest('hex');
+    const [hash, runnerSource, evaluatorSource] = await Promise.all([sourceHash(),
+        readFile(new URL('./ai-ablation.js', import.meta.url)), readFile(new URL('./ai-evaluate.js', import.meta.url))]);
+    const runnerHash = createHash('sha256').update(runnerSource).digest('hex');
+    const evaluatorHash = createHash('sha256').update(evaluatorSource).digest('hex');
     const started = performance.now();
     const results = await runTournament(tasks, { jobs, onProgress: event => onProgress?.({ ...event, label: labels[event.index] }) });
     const comparisons = {};
@@ -45,7 +47,7 @@ export async function runAblation({ candidates, reference = 'tactical-v5', oppon
         comparisons[plan.config.candidate] = { config: plan.config, ...comparison };
     }
     return { formatVersion: 1, config: { candidates, reference, opponent, suite, maps: plans[0].config.maps,
-        seeds: plans[0].config.seeds, ticks: ticks ?? null }, sourceHash: hash, runnerHash, node: process.version,
+        seeds: plans[0].config.seeds, ticks: ticks ?? null }, sourceHash: hash, runnerHash, evaluatorHash, node: process.version,
         methodology: 'All candidates face the same fixed opponents/profiles. Reference games are simulated once and reused. Mirrored sides are averaged within map-seed units; descriptive deltas only. Encounter score uses typed player kills separately from team outcomes.',
         execution: { jobs: Math.min(jobs, tasks.length), requestedJobs: jobs, totalMs: performance.now() - started,
             simulatedGames: results.length, referenceGames: referenceTasks.length },

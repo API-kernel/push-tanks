@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { runAblation } from '../tools/ai-ablation.js';
 
 test('component experiments share reference games without creating false A/A differences', async () => {
@@ -16,6 +18,8 @@ test('component experiments share reference games without creating false A/A dif
         assert.equal(report.comparisons['experiment-v6-yield'].summary[name].gamesPerArm, 2);
     }
     assert.match(report.runnerHash, /^[a-f0-9]{64}$/);
+    assert.equal(report.evaluatorHash, createHash('sha256').update(
+        await readFile(new URL('../tools/ai-evaluate.js', import.meta.url))).digest('hex'));
 });
 
 test('invalid component coordinates fail before workers start', async () => {
