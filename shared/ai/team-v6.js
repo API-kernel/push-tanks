@@ -27,8 +27,9 @@ export function withTeamV6(Base, { enabled = true, maxApproachTicks = 96, hyster
         assignTasks() {
             super.assignTasks();
             if (!enabled) return;
-            const room = this.room, all = liveTanks(room), fields = strategyFields(this, 'crossfire', 8);
+            const room = this.room, all = liveTanks(room);
             for (const team of [1, 2]) {
+                const fields = strategyFields(this, 'crossfire', 8, team);
                 const bots = room.enemies.filter(bot => bot.team === team && freeRole(this.tasks.get(bot.id)));
                 const old = this.crossfirePlansV6.get(team);
                 const oldTarget = old && all.find(target => target.id === old.targetId && target.team !== team);
@@ -49,7 +50,8 @@ export function withTeamV6(Base, { enabled = true, maxApproachTicks = 96, hyster
                     .sort((a, b) => (weaponPower(b) + (b.hp || 1) * 2) - (weaponPower(a) + (a.hp || 1) * 2)
                         || distance(bots[0], a) - distance(bots[0], b));
                 let best = null;
-                // Two contacts, four participants and eight fields are hard caps.
+                // Two contacts, four participants per contact and four
+                // fields per planning team are hard caps (eight total).
                 for (const target of targets.slice(0, 2)) {
                     const local = bots.filter(bot => distance(bot, target) <= 112)
                         .sort((a, b) => distance(a, target) - distance(b, target)).slice(0, 4);

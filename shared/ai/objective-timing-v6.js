@@ -91,8 +91,9 @@ export function withObjectiveTimingV6(Base, { enabled = true, horizon = 160 } = 
             super.assignTasks();
             this.timingThreatsV6.clear();
             if (!enabled || !this.room.settings.basesEnabled) return;
-            const room = this.room, all = liveTanks(room), fields = strategyFields(this, 'objectives', 8);
+            const room = this.room, all = liveTanks(room);
             for (const home of room.teamManager.getAllBases().filter(base => !base.isDead)) {
+                const fields = strategyFields(this, 'objectives', 8, home.team);
                 const opponents = all.filter(target => target.team !== home.team);
                 // Exposed firing lines are ranked before proximity. The two
                 // selected threats get complete, bounded route estimates.

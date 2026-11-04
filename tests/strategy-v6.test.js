@@ -243,3 +243,55 @@ test('a timed screen physically absorbs a base-bound shell under BattleSystem', 
     assert.ok(!room.teamManager.getAllBases().find(base => base.team === 1).isDead);
     assert.ok(!room.enemies.includes(defender));
 });
+
+test('resource search budgets reject a lost race equally with six tanks on either side', () => {
+    for (const swapTeams of [false, true]) {
+        const room = arena();
+        for (const side of [1, 2]) for (const [x, y, level] of [
+            [16, 64, 1], [16, 96, 1], [16, 128, 1], [72, 96, 4], [72, 120, 4], [0, 192, 4]
+        ]) tank(room, swapTeams ? 3 - side : side, side === 1 ? x : 192 - x, side === 1 ? y : 192 - y,
+            { level, hp: 2, baseHp: 2, bulletSpeed: 4, bulletCooldownMax: 12 });
+        room.activeBonus = { type: 'gun', x: 96, y: 96 };
+        const ai = new (withResourceV6(Probe))(room); ai.assignTasks();
+        // Near full-level enemies win the race against each side's distant
+        // eligible collectors. Previously only team 1 got those race fields.
+        assert.ok([...ai.tasks.values()].every(task => task.kind !== 'bonus'));
+        const cache = ai.strategyFieldsV6.get('resources');
+        assert.equal(cache.requests.get(1).size, 4); assert.equal(cache.requests.get(2).size, 4);
+        assert.ok(cache.count <= 8);
+    }
+});
+
+test('crossfire quotas stay independent when two concrete corridors exhaust a contact search', () => {
+    for (const swapTeams of [false, true]) {
+        const room = arena();
+        for (const row of [8, 9, 12, 13, 16, 17]) for (let col = 0; col < 26; col++) room.map[row][col] = { type: 2, mask: 15 };
+        for (const [side, positions] of [
+            [1, [[16, 80], [40, 80], [64, 80], [128, 112], [152, 112], [176, 112]]],
+            [2, [[80, 80], [112, 112], [0, 16], [16, 0], [176, 176], [192, 176]]]
+        ]) for (const [index, [x, y]] of positions.entries()) {
+            const dangerous = side === 1 || index < 2;
+            tank(room, swapTeams ? 3 - side : side, x, y, { speed: 35 / 60, hp: dangerous ? 2 : 1,
+                bulletSpeed: dangerous ? 4 : 2, bulletCooldownMax: dangerous ? 12 : 60 });
+        }
+        const ai = new (withTeamV6(Probe))(room); ai.assignTasks();
+        const cache = ai.strategyFieldsV6.get('crossfire');
+        // The first physical side requests six fields and gets its quota of
+        // four. The other needs three; swapping team labels preserves both.
+        assert.equal(cache.requests.get(swapTeams ? 2 : 1).size, 4);
+        assert.equal(cache.requests.get(swapTeams ? 1 : 2).size, 3);
+        assert.ok(cache.count <= 8); assert.equal(ai.crossfirePlansV6.size, 0);
+    }
+});
+
+test('objective estimates keep separate four-field quotas for two threats and two defenders', () => {
+    const room = arena(true);
+    for (const side of [1, 2]) for (const [x, y] of [[96, 168], [72, 192], [0, 128], [96, 120], [40, 0], [176, 112]]) {
+        tank(room, side, side === 1 ? x : 192 - x, side === 1 ? y : 192 - y,
+            { hp: 2, bulletSpeed: 4, bulletCooldownMax: 12 });
+    }
+    const ai = new (withObjectiveTimingV6(Probe))(room); ai.assignTasks();
+    const cache = ai.strategyFieldsV6.get('objectives');
+    assert.equal(cache.requests.get(1).size, 4); assert.equal(cache.requests.get(2).size, 4);
+    assert.ok(cache.count <= 8);
+});

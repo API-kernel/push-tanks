@@ -54,8 +54,9 @@ export function withResourceV6(Base, { enabled = true, maxTravelTicks = 210, hys
             if (!enabled) return;
             const room = this.room, bonus = room.activeBonus;
             if (!bonus) { this.resourceCollectorsV6.clear(); return; }
-            const key = `${bonus.type}:${bonus.x}:${bonus.y}`, fields = strategyFields(this, 'resources', 8), all = liveTanks(room);
+            const key = `${bonus.type}:${bonus.x}:${bonus.y}`, all = liveTanks(room);
             for (const team of [1, 2]) {
+                const fields = strategyFields(this, 'resources', 8, team);
                 const home = room.teamManager.getAllBases().find(base => base.team === team && !base.isDead);
                 const fatal = home ? Math.min(Infinity, ...all.filter(other => other.team !== team).map(other => {
                     const lane = baseLaneTimingV6(room, other, home);
@@ -71,7 +72,9 @@ export function withResourceV6(Base, { enabled = true, maxTravelTicks = 210, hys
                     .sort((a, b) => (distance(a.bot, bonus) / a.bot.speed - a.utility)
                         - (distance(b.bot, bonus) / b.bot.speed - b.utility));
                 const continuing = bids.find(bid => previous?.key === key && bid.bot.id === previous.id);
-                const candidates = [...new Set([continuing, ...bids.slice(0, 3)].filter(Boolean))];
+                // Reserve two of this team's four field slots for races.
+                // Keep the incumbent in the two collector candidates.
+                const candidates = [continuing, ...bids.filter(bid => bid !== continuing)].filter(Boolean).slice(0, 2);
                 for (const bid of candidates) {
                     const field = fields.get(bid.bot, { allowBreach: true });
                     const route = bonusRouteV6(field, bonus);

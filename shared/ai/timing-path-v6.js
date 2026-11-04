@@ -178,24 +178,31 @@ export function createTickField(room, tank, { allowBreach = false, maxExpansions
     };
 }
 
-// Shared only within one strategy refresh. Caps are per feature, so enabling
-// another hypothesis cannot silently consume this feature's search allowance.
-export function strategyFields(controller, feature, limit = 8) {
+// Shared only within one strategy refresh. Each planning team owns half the
+// request slots, including requests for enemy race/threat fields. Cache hits
+// reuse computation but consume the same request slot on either side: iteration
+// order cannot grant the second team extra information or exhaust its budget.
+export function strategyFields(controller, feature, limit = 8, team) {
+    if (team !== 1 && team !== 2) throw new RangeError('strategy field requests require a planning team');
     controller.strategyFieldsV6 ??= new Map();
     let cache = controller.strategyFieldsV6.get(feature);
     if (!cache || cache.tick !== controller.tick) {
-        cache = { tick: controller.tick, fields: new Map(), count: 0 };
+        cache = { tick: controller.tick, fields: new Map(), count: 0, requests: new Map([[1, new Set()], [2, new Set()]]) };
         controller.strategyFieldsV6.set(feature, cache);
     }
+    const requests = cache.requests.get(team), quota = Math.floor(limit / 2);
     return { get(tank, options = {}) {
         const key = `${tank.id}:${!!options.allowBreach}:${options.crowd !== false}`;
+        if (!requests.has(key)) {
+            if (requests.size >= quota || (!cache.fields.has(key) && cache.count >= limit)) return null;
+            requests.add(key);
+        }
         if (cache.fields.has(key)) return cache.fields.get(key);
-        if (cache.count >= limit) return null;
         cache.count++;
         const field = createTickField(controller.room, tank, options);
         cache.fields.set(key, field);
         return field;
-    }, get count() { return cache.count; } };
+    }, get count() { return cache.count; }, get teamCount() { return requests.size; }, quota };
 }
 
 export const clearPointV6 = (room, tank, p) => footprint(room, tank, p, false) !== null;
