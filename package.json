@@ -12,6 +12,7 @@
     "test": "node --test tests/*.test.js",
     "ai:benchmark": "node tools/ai-benchmark.js",
     "ai:evaluate": "node tools/ai-evaluate.js",
+    "ai:ablate": "node tools/ai-ablation.js",
     "ai:profile": "node tools/ai-profile.js"
   }
 }
