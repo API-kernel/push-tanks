@@ -9,6 +9,16 @@ export function weaponPower(tank) {
     return speed * 60 / Math.max(12, cooldown);
 }
 
+function physicalSnapshot(target) {
+    return { id: target.id, team: target.team, x: target.x, y: target.y,
+        width: target.width || 16, height: target.height || 16,
+        hp: target.hp, speed: target.speed, direction: target.direction,
+        level: target.level || 1, isMoving: target.isMoving,
+        shieldTimer: target.shieldTimer || 0, bulletSpeed: target.bulletSpeed,
+        bulletTimer: target.bulletTimer, bulletCooldown: target.bulletCooldown,
+        bulletCooldownMax: target.bulletCooldownMax };
+}
+
 // Team decisions are composed with independently tested navigation and combat policies.
 export class TacticalCommander extends TacticalV2 {
     reset() {
@@ -30,7 +40,7 @@ export class TacticalCommander extends TacticalV2 {
         this.tasks.clear();
         for (const team of [1, 2]) {
             const bots = room.enemies.filter(b => b.team === team);
-            const opponents = all.filter(t => t.team !== team);
+            const opponents = all.filter(t => t.team !== team).map(physicalSnapshot);
             const home = bases.find(b => b.team === team);
             const enemyBase = bases.find(b => b.team !== team);
             const available = new Set(bots);
@@ -47,7 +57,7 @@ export class TacticalCommander extends TacticalV2 {
             const threats = opponents.map(target => ({ target, score: threat(target) }))
                 .filter(t => t.score >= 40).sort((a, b) => b.score - a.score);
             const setTask = (bot, kind, target, extra = {}) => {
-                this.tasks.set(bot.id, { kind, target: { ...target }, ...extra });
+                this.tasks.set(bot.id, { kind, target: physicalSnapshot(target), ...extra });
                 available.delete(bot);
                 if (target.id !== undefined) assigned.set(target.id, (assigned.get(target.id) || 0) + 1);
             };
@@ -79,7 +89,7 @@ export class TacticalCommander extends TacticalV2 {
                 const collector = continuing && bid(continuing) <= bid(candidates[0]) + 24 ? continuing : candidates[0];
                 if (collector) {
                     const closerAlly = all.some(t => t.team === team && t.id !== collector.id
-                        && !bots.includes(t) && distance(t, bonus) < 24 && distance(collector, bonus) > 32);
+                        && !bots.some(b => b.id === t.id) && distance(t, bonus) < 24 && distance(collector, bonus) > 32);
                     if (!closerAlly) {
                         setTask(collector, 'bonus', bonus);
                         this.collectors.set(team, { id: collector.id, key: `${bonus.type}:${bonus.x}:${bonus.y}` });

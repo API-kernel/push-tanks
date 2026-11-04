@@ -1,16 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { GameRoom } from '../game_room.js';
 import { PlayerProxy } from '../tools/player-proxy.js';
 import { simulate } from '../tools/ai-benchmark.js';
 
-test('released v1 and its planning dependencies stay frozen for fair comparison', async () => {
-    const frozen = JSON.parse(await readFile(new URL('../shared/ai/frozen-v1.json', import.meta.url), 'utf8'));
+test('released policies and fixed adversaries stay frozen for fair comparison', async () => {
+    const directory = new URL('../shared/ai/', import.meta.url);
+    const manifests = (await readdir(directory)).filter(file => /^frozen-.*\.json$/.test(file));
+    for (const manifest of manifests) {
+    const frozen = JSON.parse(await readFile(new URL(manifest, directory), 'utf8'));
     for (const [file, hash] of Object.entries(frozen)) {
         const actual = createHash('sha256').update(await readFile(new URL(`../${file}`, import.meta.url))).digest('hex');
         assert.equal(actual, hash, `${file} changed: introduce a new version instead`);
+    }
     }
 });
 
