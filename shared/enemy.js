@@ -42,7 +42,7 @@ export function updateEnemies(room) {
         if (spawned >= totalReserve) return;
 
         // Лимит активных
-        const activeUnits = (room.getTeamPlayerCount(team.id) || 0) + 
+        const activeUnits = room.getActiveTeamPlayerCount(team.id) +
                             enemies.filter(e => e.team === team.id).length + 
                             pendingSpawns.filter(s => s.team === team.id).length;
 

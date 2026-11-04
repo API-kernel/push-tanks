@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { GameRoom } from '../game_room.js';
 import { PlayerProxy } from '../tools/player-proxy.js';
 import { simulate } from '../tools/ai-benchmark.js';
+import { updateEnemies } from '../shared/enemy.js';
+import { SPAWN_DELAY } from '../shared/config.js';
 
 test('released policies and fixed adversaries stay frozen for fair comparison', async () => {
     const directory = new URL('../shared/ai/', import.meta.url);
@@ -44,4 +46,31 @@ test('a scenario using real player physics is reproducible', async () => {
     assert.deepEqual(a.metrics, b.metrics);
     assert.equal(a.playerSide, 2);
     assert.ok(a.metrics[2].shots > 0);
+});
+
+test('an exhausted player frees an active slot for the remaining bot reserve', () => {
+    const room = new GameRoom('RESERVE', null, [], { seed: 1, silent: true });
+    room.rawMapData = Array.from({ length: 26 }, () => Array(26).fill(0));
+    room.settings.botsReserve = { 1: 0, 2: 1 };
+    room.settings.maxActiveTanks = 1;
+    room.resetGame();
+    room.players.ghost = { id: 'ghost', team: 2, isDead: true, lives: -1, x: -1000, y: -1000 };
+    room.teamSpawnTimers[2] = SPAWN_DELAY;
+    updateEnemies(room);
+    assert.equal(room.pendingSpawns.filter(p => p.team === 2).length, 1);
+    assert.equal(room.getTeamPlayerCount(2), 1);
+    assert.equal(room.getActiveTeamPlayerCount(2), 0);
+});
+
+test('a player awaiting respawn keeps its slot reserved', () => {
+    const room = new GameRoom('RESPAWN', null, [], { seed: 1, silent: true });
+    room.rawMapData = Array.from({ length: 26 }, () => Array(26).fill(0));
+    room.settings.botsReserve = { 1: 0, 2: 1 };
+    room.settings.maxActiveTanks = 1;
+    room.resetGame();
+    room.players.waiting = { id: 'waiting', team: 2, isDead: true, lives: 0, x: -1000, y: -1000 };
+    room.teamSpawnTimers[2] = SPAWN_DELAY;
+    updateEnemies(room);
+    assert.equal(room.pendingSpawns.length, 0);
+    assert.equal(room.getActiveTeamPlayerCount(2), 1);
 });

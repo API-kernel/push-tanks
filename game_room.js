@@ -184,6 +184,10 @@ export class GameRoom {
         return Object.values(this.players).filter(p => p.team === teamId).length;
     }
 
+    getActiveTeamPlayerCount(teamId) {
+        return Object.values(this.players).filter(p => p.team === teamId && (!p.isDead || p.isSpawning || p.lives >= 0)).length;
+    }
+
     updateSettings(newSettings) {
         this.settings = { ...this.settings, ...newSettings };
 
