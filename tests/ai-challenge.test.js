@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { GameRoom } from '../game_room.js';
 import { TANK_STATS } from '../shared/config.js';
 import { createBullet, updateBullets } from '../shared/bullet.js';
@@ -9,6 +12,7 @@ import { ReactivePlayerProxy, REACTIVE_PLAYER_POLICIES } from '../tools/reactive
 import { buildChallengePlan, crossfireGeometry, normalizeChallengeOptions, runChallenges, simulateChallenge, summarizeChallenges } from '../tools/ai-challenge.js';
 
 const workerURL = new URL('../tools/ai-challenge.js', import.meta.url);
+const exec = promisify(execFile);
 const input = direction => ({ up: direction === 'UP', down: direction === 'DOWN', left: direction === 'LEFT',
     right: direction === 'RIGHT', fire: false, cheat0: false });
 
@@ -151,6 +155,26 @@ test('challenge plans fix adversary seeds across candidates and mirrored sides, 
     assert.throws(() => normalizeChallengeOptions({ adversarySeed: Infinity }), /uint32/);
 });
 
+test('ordinary objective fortifications reach the shared engine and invalid boolean options fail', async () => {
+    const options = { mode: 'objective', adversary: 'old:duelist', ticks: 1, map: '1', seed: 17 };
+    const ordinary = await simulateChallenge({ ...options, vibranium: false });
+    assert.equal(ordinary.challengeOptions.vibranium, false);
+    assert.equal(ordinary.observations.vibraniumEnabled, false);
+    assert.equal((await simulateChallenge(options)).observations.vibraniumEnabled, true);
+    const plan = buildChallengePlan({ candidates: ['tactical-v5'], maps: ['1'], seeds: [7], vibranium: false,
+        modes: ['objective', 'crossfire'], adversaries: ['old:duelist'], levels: [4], reactions: [3], ticks: 1 });
+    assert.equal(plan.config.vibranium, false);
+    assert.ok(plan.tasks.every(task => task.options.vibranium === false));
+    assert.equal(normalizeChallengeOptions({ mode: 'crossfire', vibranium: true }).vibranium, false);
+    for (const value of ['false', 'true', 'unknown', 0, 1, null]) {
+        await assert.rejects(simulateChallenge({ ...options, vibranium: value }), /vibranium must be a boolean/);
+        assert.throws(() => buildChallengePlan({ vibranium: value }), /vibranium must be a boolean/);
+    }
+    await assert.rejects(exec(process.execPath, ['tools/ai-challenge.js', '--vibranium', 'sometimes'], {
+        cwd: new URL('../', import.meta.url),
+    }), error => /vibranium must be true or false/.test(error.stderr));
+});
+
 test('crossfire metric needs two distinct ready bots on perpendicular unblocked lanes', () => {
     const { room, player } = fixture();
     room.enemies = [{ id: 1000, team: 2, x: 32, y: 80, width: 16, height: 16, direction: 'RIGHT', level: 1, bulletSpeed: 2, bulletTimer: 0 },
@@ -187,6 +211,8 @@ test('shared reference pairing and raw source metadata preserve same-policy cont
         adversaries: ['reactive-dodge'], modes: ['encounter', 'crossfire'], levels: [4], reactions: [3], ticks: 60, jobs: 2 });
     assert.equal(report.games.length, 8);
     for (const key of ['sourceHash', 'harnessHash', 'adversaryHash', 'frozenProxyHash', 'challengeSourceHash']) assert.match(report[key], /^[a-f0-9]{64}$/);
+    const frozen = JSON.parse(await readFile(new URL('../shared/ai/frozen-reactive-v1.json', import.meta.url), 'utf8'));
+    assert.equal(report.adversaryHash, frozen['tools/reactive-player-proxy.js']);
     for (const summary of Object.values(report.comparisons['tactical-v5'].summary)) assert.equal(summary.meanDelta, 0);
     for (const cell of report.comparisons['tactical-v5'].cells) for (const sample of cell.paired.samples) for (const side of sample.sides) {
         assert.equal(report.games[side.candidateIndex].arm, 'candidate');

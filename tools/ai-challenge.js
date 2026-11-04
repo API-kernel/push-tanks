@@ -37,13 +37,14 @@ export function normalizeChallengeOptions(options = {}) {
     const mode = options.mode ?? 'encounter', adversary = options.adversary ?? 'reactive-dodge';
     if (!CHALLENGE_MODES.includes(mode)) throw new Error(`Unknown challenge mode: ${mode}`);
     if (!CHALLENGE_ADVERSARIES.includes(adversary)) throw new Error(`Unknown adversary: ${adversary}`);
+    if (options.vibranium !== undefined && typeof options.vibranium !== 'boolean') throw new Error('vibranium must be a boolean');
     const candidateSide = options.candidateSide ?? 1;
     if (![1, 2].includes(candidateSide)) throw new Error('candidateSide must be 1 or 2');
     const objective = mode === 'objective', crossfire = mode === 'crossfire';
     const config = validateSimulationOptions({ ...options,
         versions: options.versions ?? { 1: 'tactical-v5', 2: 'tactical-v5' }, candidateSide,
         ticks: options.ticks ?? (objective ? 7200 : 3600), tanks: objective ? 4 : crossfire ? 2 : 1,
-        reserve: objective ? 12 : crossfire ? 2 : 1, bases: objective, vibranium: objective,
+        reserve: objective ? 12 : crossfire ? 2 : 1, bases: objective, vibranium: objective ? options.vibranium ?? true : false,
         players: 1, playerSide: 3 - candidateSide, playerLives: objective ? 3 : 0,
         playerPolicy: adversary.startsWith('old:') ? adversary.slice(4) : 'duelist',
     });
@@ -76,7 +77,7 @@ export async function simulateChallenge(options = {}) {
     const config = normalizeChallengeOptions(options);
     const observations = { firstPlayerKillTick: null, firstCandidateLossTick: null, firstOwnBaseLossTick: null,
         candidateBotLosses: 0, proxyActiveTicks: 0, proxyVulnerableTicks: 0,
-        pairActiveTicks: 0, twoAxisLineTicks: 0, twoAxisReadyTicks: 0, yieldInterruptions: null };
+        pairActiveTicks: 0, twoAxisLineTicks: 0, twoAxisReadyTicks: 0, yieldInterruptions: null, vibraniumEnabled: null };
     const created = [];
     const game = await simulate(config, {
         configureRoom(room) { room.settings.botsReserve = { ...config.initialReserves }; },
@@ -89,6 +90,7 @@ export async function simulateChallenge(options = {}) {
             return proxy;
         },
         observeTick({ room, elapsed }) {
+            observations.vibraniumEnabled ??= room.settings.vibraniumBase;
             for (const event of room.bulletEvents) {
                 if (event.type === 'TANK_EXPLODE' && event.isPlayer && event.team === config.candidateSide) observations.firstPlayerKillTick ??= elapsed;
                 if (event.type === 'TANK_EXPLODE' && !event.isPlayer && event.targetTeam === config.candidateSide) {
@@ -117,8 +119,9 @@ export async function simulateChallenge(options = {}) {
 }
 
 export function buildChallengePlan({ candidates = ['tactical-v5'], reference = 'tactical-v5', opponent = 'tactical-v5',
-    suite = 'quick', maps, seeds, adversaries, modes = CHALLENGE_MODES, levels, reactions, ticks } = {}) {
+    suite = 'quick', maps, seeds, adversaries, modes = CHALLENGE_MODES, levels, reactions, ticks, vibranium = true } = {}) {
     if (!['quick', 'full'].includes(suite)) throw new Error(`Unknown challenge suite: ${suite}`);
+    if (typeof vibranium !== 'boolean') throw new Error('vibranium must be a boolean');
     candidates = distinct(candidates, 'candidates', version => VERSIONS.includes(version));
     if (!VERSIONS.includes(reference) || !VERSIONS.includes(opponent)) throw new Error('Reference and opponent must be registered policies');
     maps = distinct(maps ?? (suite === 'quick' ? ['1'] : ['The_Void', 'Bunker', '1']), 'maps', map => typeof map === 'string' && map.trim());
@@ -134,7 +137,8 @@ export function buildChallengePlan({ candidates = ['tactical-v5'], reference = '
         const id = `${mode}:${adversary}:level${playerLevel}:reaction${reaction}`;
         const cell = { id, mode, kind: mode === 'objective' ? 'player' : 'encounter', adversary,
             scoreBasis: mode === 'objective' ? 'team-game' : 'proxy-destruction', opponent,
-            options: { mode, adversary, playerLevel, reaction, ticks: ticks ?? (suite === 'quick' ? 1200 : mode === 'objective' ? 7200 : 3600) } };
+            options: { mode, adversary, playerLevel, reaction, vibranium: mode === 'objective' ? vibranium : false,
+                ticks: ticks ?? (suite === 'quick' ? 1200 : mode === 'objective' ? 7200 : 3600) } };
         cells.push(cell);
         for (const map of maps) for (const seed of seeds) for (const side of [1, 2]) {
             for (const [arm, version] of [...candidates.map(version => ['candidate', version]), ['reference', reference]]) {
@@ -144,7 +148,8 @@ export function buildChallengePlan({ candidates = ['tactical-v5'], reference = '
             }
         }
     }
-    return { config: { candidates, reference, opponent, suite, maps, seeds, adversaries, modes, levels, reactions, ticks: ticks ?? null }, cells, tasks };
+    return { config: { candidates, reference, opponent, suite, maps, seeds, adversaries, modes, levels, reactions,
+        ticks: ticks ?? null, vibranium }, cells, tasks };
 }
 
 function observationSummary(games) {
@@ -215,6 +220,7 @@ export async function runChallenges({ jobs, onProgress, ...options } = {}) {
             inference: 'Descriptive deltas, no independent-match assumption or confidence interval; score bases remain separate.',
             encounters: 'Typed player destruction is separate from team victory. Ordinary encounter includes enemy bot reserve 1 after proxy death.',
             crossfire: 'Two candidate bot reserves versus one player and zero enemy bot reserve; normal spawn timing, bonuses and all engine rules still apply.',
+            fortifications: 'config.vibranium controls objective matches; modes without bases always disable vibranium.',
             geometry: 'twoAxisLineTicks requires two distinct live bots with unblocked horizontal/vertical lanes within144px to a vulnerable proxy; opportunity only, not guaranteed impact.',
             initialLevel: 'Initial weapon level only; ordinary respawns/bonuses can change it. These scripts do not measure human skill.',
         }, execution: { backend: 'worker_threads', jobs: Math.min(requestedJobs, games.length), requestedJobs, ...capacity,
@@ -225,18 +231,19 @@ export async function runChallenges({ jobs, onProgress, ...options } = {}) {
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--help')) {
-        console.log('node tools/ai-challenge.js [--candidates tactical-v5,...] [--reference tactical-v5] [--opponent tactical-v5] [--suite quick|full] [--maps 1,7|all] [--seeds 6007,...] [--adversaries old:duelist,reactive-dodge,switch-rush,bait-corner] [--modes objective,encounter,crossfire] [--levels 1,4] [--reactions 3,6,12] [--ticks N] [--jobs N] [--output report.json]');
+        console.log('node tools/ai-challenge.js [--candidates tactical-v5,...] [--reference tactical-v5] [--opponent tactical-v5] [--suite quick|full] [--maps 1,7|all] [--seeds 6007,...] [--adversaries old:duelist,reactive-dodge,switch-rush,bait-corner] [--modes objective,encounter,crossfire] [--levels 1,4] [--reactions 3,6,12] [--vibranium true|false] [--ticks N] [--jobs N] [--output report.json]');
         return;
     }
     const lists = new Set(['candidates', 'seeds', 'adversaries', 'modes', 'levels', 'reactions']);
     const numbers = new Set(['ticks', 'jobs']);
-    const allowed = new Set([...lists, ...numbers, 'reference', 'opponent', 'suite', 'maps', 'output']);
+    const allowed = new Set([...lists, ...numbers, 'reference', 'opponent', 'suite', 'maps', 'output', 'vibranium']);
     const options = {};
     for (let index = 0; index < args.length; index += 2) {
         const name = args[index].replace(/^--/, ''), value = args[index + 1];
         if (!args[index].startsWith('--') || !allowed.has(name) || !value || value.startsWith('--') || name in options) throw new Error(`Invalid option: ${args[index]}`);
+        if (name === 'vibranium' && !['true', 'false'].includes(value)) throw new Error('vibranium must be true or false');
         options[name] = lists.has(name) ? value.split(',').map(item => ['seeds', 'levels', 'reactions'].includes(name) ? item.trim() ? Number(item) : NaN : item.trim())
-            : numbers.has(name) ? Number(value) : value;
+            : numbers.has(name) ? Number(value) : name === 'vibranium' ? value === 'true' : value;
     }
     const { output, ...config } = options;
     const report = await runChallenges({ ...config, onProgress: ({ completed, total, challengeTask: task }) => {
