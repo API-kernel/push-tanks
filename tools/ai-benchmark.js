@@ -9,7 +9,7 @@ import { cpuCapacity, runTournament, validateJobs } from './ai-pool.js';
 
 export { runTournament } from './ai-pool.js';
 
-import { BOT_VERSIONS as VERSIONS } from '../shared/ai/versions.js';
+import { BOT_VERSIONS as VERSIONS, DEFAULT_BOT_VERSION } from '../shared/ai/versions.js';
 export { VERSIONS };
 const mapsURL = new URL('../shared/maps/', import.meta.url);
 
@@ -148,7 +148,7 @@ export async function sourceHash() {
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--help')) {
-        console.log('node tools/ai-benchmark.js [--candidate tactical-v2] [--baseline tactical-v1] [--self-play true] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--jobs N] [--output report.json]');
+        console.log(`node tools/ai-benchmark.js [--candidate ${DEFAULT_BOT_VERSION}] [--baseline tactical-v2] [--self-play true] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--jobs N] [--output report.json]`);
         return;
     }
     const allowed = new Set(['candidate', 'baseline', 'maps', 'seeds', 'ticks', 'tanks', 'reserve', 'bases', 'vibranium', 'output', 'players', 'player-policy', 'player-level', 'player-lives', 'reaction', 'jobs', 'self-play']);
@@ -158,7 +158,7 @@ async function main() {
         if (!args[i].startsWith('--') || !allowed.has(name) || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`Invalid option: ${args[i]}`);
         opts[name] = args[i + 1];
     }
-    const candidate = opts.candidate || 'tactical-v2', baseline = opts.baseline || 'tactical-v1';
+    const candidate = opts.candidate || DEFAULT_BOT_VERSION, baseline = opts.baseline || 'tactical-v2';
     if (!VERSIONS.includes(candidate) || !VERSIONS.includes(baseline)) throw new Error('Select registered versions');
     const maps = opts.maps === 'all' ? (await readdir(mapsURL)).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)).sort()
         : (opts.maps || '1,7,15,Bunker,The_Void').split(',');

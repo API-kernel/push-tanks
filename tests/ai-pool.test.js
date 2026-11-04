@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { cpuCapacity, runTournament, SimulationPool } from '../tools/ai-pool.js';
 import { simulate, sourceHash, summarize } from '../tools/ai-benchmark.js';
+import { DEFAULT_BOT_VERSION } from '../shared/ai/versions.js';
 
 const exec = promisify(execFile);
 const cwd = new URL('../', import.meta.url);
@@ -241,7 +242,7 @@ test('CLI accepts jobs and records concurrency and source metadata', async () =>
         assert.equal(report.sourceHash, await sourceHash());
         assert.equal(report.node, process.version);
         assert.equal(report.games.length, 2);
-        assert.deepEqual(report.games.map(game => game.versions[1]), ['tactical-v2', 'tactical-v1']);
+        assert.deepEqual(report.games.map(game => game.versions[1]), [DEFAULT_BOT_VERSION, 'tactical-v2']);
         assert.deepEqual(report.games.map(game => game.candidateSide), [1, 2]);
         assert.equal(report.selfPlay, false);
         assert.match(stdout, /\[2\/2\]/);
@@ -252,7 +253,7 @@ test('CLI accepts jobs and records concurrency and source metadata', async () =>
 
 test('CLI supports explicit self-play and same-policy player scenarios without relaxing team capacity', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'push-tanks-ai-self-play-'));
-    const base = ['tools/ai-benchmark.js', '--baseline', 'tactical-v2', '--maps', '1', '--seeds', '3',
+    const base = ['tools/ai-benchmark.js', '--candidate', 'tactical-v2', '--baseline', 'tactical-v2', '--maps', '1', '--seeds', '3',
         '--ticks', '60', '--tanks', '1', '--reserve', '1', '--jobs', '2'];
     try {
         for (const options of [['--self-play', 'true'], ['--players', '1']]) {

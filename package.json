@@ -10,6 +10,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test tests/*.test.js",
-    "ai:benchmark": "node tools/ai-benchmark.js"
+    "ai:benchmark": "node tools/ai-benchmark.js",
+    "ai:evaluate": "node tools/ai-evaluate.js",
+    "ai:profile": "node tools/ai-profile.js"
   }
 }

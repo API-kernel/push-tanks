@@ -9,7 +9,7 @@ export const BOT_POLICIES = Object.freeze({ 'tactical-v1': TacticalAI, 'tactical
     'tactical-v4': TacticalV4, 'tactical-v5': TacticalV5,
     'experiment-v4-random-spawn': TacticalV4RandomSpawn, ...EXPERIMENT_POLICIES });
 export const BOT_VERSIONS = Object.freeze(['legacy', ...Object.keys(BOT_POLICIES)]);
-export const DEFAULT_BOT_VERSION = 'tactical-v1';
+export const DEFAULT_BOT_VERSION = 'tactical-v5';
 
 export function botVersionFor(settings, team) {
     const version = settings.botVersions?.[team] || settings.botVersion;

@@ -8,6 +8,7 @@ import { TacticalCombat } from '../shared/ai/combat-v3.js';
 
 function arena() {
     const room = new GameRoom('COMBAT', null, [], { seed: 123, silent: true });
+    room.settings.botVersion = 'tactical-v1'; // The slot below holds the component under test.
     room.settings.basesEnabled = false;
     room.settings.botsReserve = { 1: 0, 2: 0 };
     room.rawMapData = Array.from({ length: 26 }, () => Array(26).fill(0));

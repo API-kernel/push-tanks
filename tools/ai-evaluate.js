@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { runTournament, sourceHash, summarize, VERSIONS } from './ai-benchmark.js';
 import { cpuCapacity, validateJobs } from './ai-pool.js';
+import { DEFAULT_BOT_VERSION } from '../shared/ai/versions.js';
 
 const mapsURL = new URL('../shared/maps/', import.meta.url);
 const releaseMaps = ['1', '7', '15', 'Bunker', 'The_Void'];
@@ -37,7 +38,7 @@ function uniqueArray(values, name, valid) {
 
 // An arm changes only the evaluated policy. Its opponent, proxy profile, map,
 // seed and candidate side are fixed across candidate/reference comparisons.
-export function buildEvaluationPlan({ candidate = 'tactical-v3', reference = 'tactical-v2', opponent = 'tactical-v1',
+export function buildEvaluationPlan({ candidate = DEFAULT_BOT_VERSION, reference = 'tactical-v2', opponent = 'tactical-v1',
     suite = 'quick', maps, seeds, ticks } = {}) {
     if (!suites.includes(suite)) throw new Error(`Unknown suite: ${suite}`);
     for (const [name, version] of Object.entries({ candidate, reference, opponent })) {
@@ -198,7 +199,7 @@ export async function runEvaluation({ jobs, onProgress, ...options } = {}) {
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--help')) {
-        console.log('node tools/ai-evaluate.js [--candidate tactical-v3] [--reference tactical-v2] [--opponent tactical-v1] [--suite quick|release|player|encounter] [--maps 1,7|all] [--seeds 1009,2003,3001] [--ticks N] [--jobs N] [--output report.json]\nQuick defaults: 48 games, 1800 ticks. Release defaults: 2280 games across 38 cells, with 7200 objective / 3600 encounter ticks. Player and encounter suites each cover all 18 fixed profiles. Progress goes to stderr; without --output the complete report goes to stdout.');
+        console.log(`node tools/ai-evaluate.js [--candidate ${DEFAULT_BOT_VERSION}] [--reference tactical-v2] [--opponent tactical-v1] [--suite quick|release|player|encounter] [--maps 1,7|all] [--seeds 1009,2003,3001] [--ticks N] [--jobs N] [--output report.json]\nQuick defaults: 48 games, 1800 ticks. Release defaults: 2280 games across 38 cells, with 7200 objective / 3600 encounter ticks. Player and encounter suites each cover all 18 fixed profiles. Progress goes to stderr; without --output the complete report goes to stdout.`);
         return;
     }
     const allowed = new Set(['candidate', 'reference', 'opponent', 'suite', 'maps', 'seeds', 'ticks', 'jobs', 'output']);

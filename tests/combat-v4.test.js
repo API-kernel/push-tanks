@@ -10,6 +10,7 @@ import { TacticalNavigation } from '../shared/ai/navigation-controller.js';
 
 function arena(bases = false) {
     const room = new GameRoom('COMBAT4', null, [], { seed: 901, silent: true });
+    room.settings.botVersion = 'tactical-v1'; // The slot below holds the component under test.
     room.settings.basesEnabled = bases;
     room.settings.vibraniumBase = false;
     room.settings.botsReserve = { 1: 0, 2: 0 };

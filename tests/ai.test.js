@@ -80,8 +80,9 @@ test('human and bot with the same physical state have equal target priority', ()
     assert.deepEqual(a.botAI.chooseShot(shooterA), b.botAI.chooseShot(shooterB));
 });
 
-test('coordinator assigns a defender and only one bonus collector', () => {
+test('v1 coordinator assigns a defender and only one bonus collector', () => {
     const room = arena(true);
+    room.settings.botVersion = 'tactical-v1';
     tank(room, 1, 64, 160);
     tank(room, 1, 160, 128);
     tank(room, 1, 32, 96);

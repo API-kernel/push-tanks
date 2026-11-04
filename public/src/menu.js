@@ -376,6 +376,12 @@ window.updateLobbyUI = (data) => {
         setVal('opt-bases', s.basesEnabled, true);
         setVal('opt-autonext', s.autoNextLevel, true);
         setVal('opt-vibranium', s.vibraniumBase, true);
-        setVal('opt-bot-ai', s.botVersion || 'tactical-v1');
+        const version = s.botVersion || 'tactical-v5';
+        const aiSelect = document.getElementById('opt-bot-ai');
+        // Preserve a server-selected laboratory policy when another setting changes.
+        if (![...aiSelect.options].some(option => option.value === version)) {
+            aiSelect.add(new Option(version.toUpperCase(), version));
+        }
+        setVal('opt-bot-ai', version);
     }
 };
