@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createBullet, updateBullets } from '../shared/bullet.js';
 import { GameRoom } from '../game_room.js';
 import { TacticalV5 } from '../shared/ai/tactical-v5.js';
 import { withTeamV6 } from '../shared/ai/team-v6.js';
@@ -186,4 +187,59 @@ test('disabled strategy flags reproduce V5 assignments', () => {
     const before = new TacticalV5(room); before.assignTasks();
     const AI = withResourceV6(withObjectiveTimingV6(withTeamV6(TacticalV5, { enabled: false }), { enabled: false }), { enabled: false });
     const after = new AI(room); after.assignTasks(); assert.deepEqual(after.tasks, before.tasks);
+});
+
+
+test('a crossfire holder fires a good ready shot while its partner is reloading', () => {
+    const room = arena(), holder = tank(room, 1, 32, 80), flanker = tank(room, 1, 40, 112, { bulletTimer: 100 });
+    tank(room, 2, 96, 80, { hp: 2, level: 4, isMoving: false, bulletSpeed: 4, bulletCooldownMax: 12 });
+    const ai = new (withTeamV6(TacticalV5))(room); ai.prepare();
+    assert.equal(ai.tasks.get(holder.id).crossfireRole, 'hold');
+    ai.update(holder);
+    assert.ok(room.bullets.some(bullet => bullet.ownerId === holder.id));
+    assert.equal(holder.bulletTimer, holder.bulletCooldownMax);
+    assert.equal(flanker.bulletTimer, 100);
+});
+
+test('the optional tick planner physically breaches or detours without changing cooldown', () => {
+    function run(cooldown) {
+        const room = arena(), own = tank(room, 1, 32, 80, { direction: 'RIGHT', bulletCooldownMax: cooldown });
+        for (let r = 9; r < 13; r++) room.map[r][8] = { type: 1, mask: 15 };
+        const ai = new (withTickPathV6(TacticalV5, { kinds: ['guard'] }))(room);
+        const task = { kind: 'guard', target: { x: 96, y: 80 } };
+        ai.tasks.set(own.id, task); ai.strategicTasks.set(own.id, task);
+        const fireTicks = [], trajectory = [];
+        for (let tick = 0; tick < 200; tick++) {
+            ai.tick++; own.bulletTimer--; ai.update(own);
+            if (room.bulletEvents.some(event => event.type === 'ENEMY_FIRE')) fireTicks.push(tick);
+            room.bulletEvents = [];
+            updateBullets(room.bullets, room.map, 208, 208, room.teamManager, false);
+            trajectory.push({ x: own.x, y: own.y });
+            if (Math.abs(own.x - 96) + Math.abs(own.y - 80) <= 4) return { ticks: tick, fireTicks, trajectory };
+        }
+        assert.fail('physical route did not reach the guard point');
+    }
+    const fast = run(12), slow = run(60);
+    assert.ok(fast.ticks < slow.ticks);
+    assert.ok(fast.trajectory.every(point => point.y === 80));
+    assert.ok(slow.trajectory.some(point => Math.abs(point.y - 80) >= 20));
+    for (let i = 1; i < fast.fireTicks.length; i++) assert.ok(fast.fireTicks[i] - fast.fireTicks[i - 1] >= 12);
+    for (let i = 1; i < slow.fireTicks.length; i++) assert.ok(slow.fireTicks[i] - slow.fireTicks[i - 1] >= 60);
+});
+
+test('a timed screen physically absorbs a base-bound shell under BattleSystem', () => {
+    const room = arena(true), defender = tank(room, 1, 88, 168, { bulletTimer: 100 });
+    tank(room, 1, 0, 128);
+    const threat = tank(room, 2, 96, 80, { level: 4, hp: 2, bulletSpeed: 4, bulletCooldownMax: 12, direction: 'DOWN' });
+    const ai = new (withObjectiveTimingV6(TacticalV5))(room); ai.prepare();
+    assert.equal(ai.tasks.get(defender.id).timingScreen, true);
+    room.bullets.push(createBullet(threat, 4));
+    for (let tick = 0; tick < 40; tick++) {
+        ai.tick++;
+        if (room.enemies.includes(defender)) { defender.bulletTimer--; ai.update(defender); }
+        updateBullets(room.bullets, room.map, 208, 208, room.teamManager, false);
+        room.battleSystem.update();
+    }
+    assert.ok(!room.teamManager.getAllBases().find(base => base.team === 1).isDead);
+    assert.ok(!room.enemies.includes(defender));
 });
