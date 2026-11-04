@@ -1,0 +1,7 @@
+{
+  "shared/ai/tactical-v3.js": "8b24863847774100e1eae2231b7edc31af230b841706503163b40302522d14ba",
+  "shared/ai/navigation-controller.js": "b5be38111be0ef41b80877c51956c6fcdf19dc334acf94adc33388cccca267af",
+  "shared/ai/navigation-v2.js": "734328a095ce78c62e198c702d08764fc0fa4b067f6f43b7d28b3f055e3dd175",
+  "shared/ai/commander-v3.js": "79da4900d3433f7559b59eb9124becabce95241f51e208b826f01abb59e7d8a2",
+  "shared/ai/combat-v3.js": "050fe2d942cdce4bcf573a00797ffdda3c767685d215e8baa582e66d9df8cfc3"
+}

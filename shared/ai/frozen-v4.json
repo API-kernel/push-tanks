@@ -1,0 +1,5 @@
+{
+  "shared/ai/tactical-v4.js": "73b5e48eb3a4f7acbf524f9594c4fbe323cae30eb5965f3709c8c98937330b07",
+  "shared/ai/navigation-v4.js": "1263e798e92a47b9500244adf4f925158272d9899695a6aaf865975c36b476f9",
+  "shared/ai/spawn-strategy.js": "62c340ed1f705830343c31985c2b2adc37520de1bc10d654064a82527fcd6230"
+}
