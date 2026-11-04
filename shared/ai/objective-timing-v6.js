@@ -31,9 +31,16 @@ export function baseLaneTimingV6(room, tank, base, position = tank) {
             }
         }
         if (blocked) continue;
-        const values = [...planes.values()];
-        let shots = 0;
-        for (let i = 0; i < values.length; i += timing.depth / 4) shots += Math.max(...values.slice(i, i + timing.depth / 4));
+        const ordered = [...planes].sort((a, b) => (a[0] - b[0]) * (dx || dy));
+        let shots = 0, contact = null, cycle = 0;
+        for (const [axis, cost] of ordered) {
+            // Destruction starts at the first physical contact. Empty space
+            // between walls cannot extend the blast's 4/8px depth.
+            if (contact === null || Math.abs(axis - contact) >= timing.depth) {
+                shots += cycle; contact = axis; cycle = cost;
+            } else cycle = Math.max(cycle, cost);
+        }
+        shots += cycle;
         const ticks = shots * timing.cooldown + solution.distance / timing.bulletSpeed;
         if (!best || ticks < best.ticks) best = { ...solution, ticks, shots, origin: { x: position.x, y: position.y }, bullet };
     }
