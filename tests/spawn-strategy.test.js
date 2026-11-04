@@ -12,7 +12,7 @@ function arena() {
 test('spawn strategy avoids allied occupancy and waits when every point is occupied', () => {
     const room = arena();
     const busy = [64, 128, 0, 192].map(x => ({ x, y: 192, team: 1 }));
-    assert.equal(chooseTacticalSpawn(room, 1, busy, () => 0), null);
+    assert.equal(chooseTacticalSpawn(room, 1, busy, () => { throw Error('blocked spawn consumed randomness'); }), null);
     busy.pop();
     assert.deepEqual(chooseTacticalSpawn(room, 1, busy, () => 0), { x: 192, y: 192 });
 });

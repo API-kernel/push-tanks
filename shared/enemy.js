@@ -52,7 +52,10 @@ export function updateEnemies(room) {
             if (teamSpawnTimers[team.id] > SPAWN_DELAY) {
                 // Собираем busyEntities для умного спавна
                 const busyEntities = [...Object.values(room.players), ...enemies, ...pendingSpawns];
-                const point = teamManager.getSpawnPoint(team.id, busyEntities, room.spawnRandom[team.id]);
+                const controller = room.botAIs[botVersionFor(settings, team.id)];
+                const point = controller?.chooseSpawnPoint
+                    ? controller.chooseSpawnPoint(team.id, busyEntities, room.spawnRandom[team.id])
+                    : teamManager.getSpawnPoint(team.id, busyEntities, room.spawnRandom[team.id]);
                 
                 if (point) {
                     createSpawnAnimation(room, team.id, point.x, point.y);

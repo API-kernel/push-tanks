@@ -7,10 +7,10 @@ import { terrainCost } from './navigation-v2.js';
 export function chooseTacticalSpawn(room, teamId, busy, random) {
     const team = room.teamManager.getTeam(teamId);
     if (!team) return null;
-    const roll = random(); // one draw, as in the original free-point selection
     const points = SPAWN_COLUMNS.map(col => ({ x: col * TILE_SIZE, y: team.spawnPixelY }));
     const available = points.filter(p => !busy.some(t => !t.isDead && Math.abs(t.x - p.x) < 16 && Math.abs(t.y - p.y) < 16));
     if (!available.length) return null;
+    const roll = random(); // one draw per successful spawn, none while blocked
     const foes = liveTanks(room).filter(t => t.team !== teamId);
     const home = room.teamManager.getAllBases().find(b => b.team === teamId && !b.isDead);
     const threats = home ? foes.filter(t => distance(t, home) < 96) : [];
