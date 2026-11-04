@@ -6,6 +6,7 @@ import { withTeamV6 } from './team-v6.js';
 import { withObjectiveTimingV6 } from './objective-timing-v6.js';
 import { withResourceV6 } from './resource-v6.js';
 import { withTickPathV6 } from './planner-v6.js';
+import { withResponseSearch } from './response-search-v6.js';
 
 export const V6_EXPERIMENT_POLICIES = Object.freeze({
     'experiment-v6-yield': withSafeYieldV6(TacticalV5),
@@ -14,6 +15,9 @@ export const V6_EXPERIMENT_POLICIES = Object.freeze({
     'experiment-v6-crossfire': withTeamV6(TacticalV6),
     'experiment-v6-crossfire-close': withTeamV6(TacticalV6, { maxApproachTicks: 32, hysteresisTicks: 24 }),
     'experiment-v6-objective': withObjectiveTimingV6(TacticalV6),
+    'experiment-v6-response': withResponseSearch(TacticalV6),
+    'experiment-v6-response-objective': withResponseSearch(withObjectiveTimingV6(TacticalV6)),
+    'experiment-v6-objective-path': withTickPathV6(withObjectiveTimingV6(TacticalV6), { kinds: ['bonus', 'guard', 'attack'] }),
     'experiment-v6-resource': withResourceV6(TacticalV6),
     'experiment-v6-path': withTickPathV6(TacticalV6),
     'experiment-v6-path-strategic': withTickPathV6(TacticalV6, { kinds: ['bonus', 'guard', 'attack'] }),
