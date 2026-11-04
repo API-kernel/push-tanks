@@ -5,6 +5,9 @@ import { pathToFileURL } from 'node:url';
 import { GameRoom } from '../game_room.js';
 import { SERVER_FPS, TANK_STATS } from '../shared/config.js';
 import { PlayerProxy, PLAYER_POLICIES } from './player-proxy.js';
+import { cpuCapacity, runTournament, validateJobs } from './ai-pool.js';
+
+export { runTournament } from './ai-pool.js';
 
 import { BOT_VERSIONS as VERSIONS } from '../shared/ai/versions.js';
 export { VERSIONS };
@@ -87,8 +90,8 @@ export function summarize(games, candidate) {
     return result;
 }
 
-async function sourceHash() {
-    const files = ['game_room.js', 'battle_system.js', 'tools/ai-benchmark.js', 'tools/player-proxy.js'];
+export async function sourceHash() {
+    const files = ['game_room.js', 'battle_system.js', 'tools/ai-benchmark.js', 'tools/ai-pool.js', 'tools/ai-worker.js', 'tools/player-proxy.js'];
     for (const dir of ['shared', 'shared/ai']) {
         for (const file of await readdir(new URL(`../${dir}/`, import.meta.url))) {
             if (file.endsWith('.js')) files.push(`${dir}/${file}`);
@@ -102,10 +105,10 @@ async function sourceHash() {
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--help')) {
-        console.log('node tools/ai-benchmark.js [--candidate tactical-v2] [--baseline tactical-v1] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--output report.json]');
+        console.log('node tools/ai-benchmark.js [--candidate tactical-v2] [--baseline tactical-v1] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--jobs N] [--output report.json]');
         return;
     }
-    const allowed = new Set(['candidate', 'baseline', 'maps', 'seeds', 'ticks', 'tanks', 'reserve', 'bases', 'vibranium', 'output', 'players', 'player-policy', 'player-level', 'player-lives', 'reaction']);
+    const allowed = new Set(['candidate', 'baseline', 'maps', 'seeds', 'ticks', 'tanks', 'reserve', 'bases', 'vibranium', 'output', 'players', 'player-policy', 'player-level', 'player-lives', 'reaction', 'jobs']);
     const opts = {};
     for (let i = 0; i < args.length; i += 2) {
         const name = args[i].replace(/^--/, '');
@@ -129,17 +132,26 @@ async function main() {
     if (!Number.isInteger(config.reaction) || config.reaction < 1) throw new Error('reaction must be >= 1');
     for (const name of ['ticks', 'tanks', 'reserve']) if (!Number.isInteger(config[name]) || config[name] < 1) throw new Error(`${name} must be a positive integer`);
     for (const name of ['bases', 'vibranium']) if (opts[name] && !['true', 'false'].includes(opts[name])) throw new Error(`${name} must be true or false`);
-    const games = [];
+    const capacity = cpuCapacity();
+    const requestedJobs = opts.jobs === undefined ? capacity.defaultJobs : validateJobs(Number(opts.jobs));
+    const tasks = [];
     for (const map of maps) {
         for (const seed of seeds) {
             for (const side of [1, 2]) {
-                const game = await simulate({ ...config, map, seed, playerSide: 3 - side, versions: { [side]: candidate, [3 - side]: baseline } });
-                games.push(game);
-                console.log(`${map} seed=${seed} candidate=${side} ${game.winner ? (game.winner === side ? 'WIN' : 'LOSS') : game.ending.toUpperCase()} (${game.gameSeconds.toFixed(1)}s)`);
+                tasks.push({ ...config, map, seed, playerSide: 3 - side, versions: { [side]: candidate, [3 - side]: baseline } });
             }
         }
     }
-    const report = { candidate, baseline, sourceHash: await sourceHash(), node: process.version, config, seeds,
+    const jobs = Math.min(requestedJobs, tasks.length);
+    const hash = await sourceHash();
+    const started = performance.now();
+    console.log(`Running ${tasks.length} games with ${jobs} workers (available CPUs: ${capacity.availableParallelism}, CPU quota: ${capacity.cpuQuota ?? 'unlimited'})`);
+    const games = await runTournament(tasks, { jobs: requestedJobs, onProgress: ({ completed, total, index, task, result: game }) => {
+        const side = 3 - task.playerSide;
+        console.log(`[${completed}/${total}] game=${index + 1} ${game.map} seed=${game.seed} candidate=${side} ${game.winner ? (game.winner === side ? 'WIN' : 'LOSS') : game.ending.toUpperCase()} (${game.gameSeconds.toFixed(1)}s)`);
+    } });
+    const report = { candidate, baseline, sourceHash: hash, node: process.version, config, seeds,
+        execution: { backend: 'worker_threads', jobs, requestedJobs, ...capacity, totalMs: performance.now() - started },
         summary: summarize(games, candidate), byMap: Object.fromEntries(maps.map(map => [map, summarize(games.filter(g => g.map === map), candidate)])), games };
     console.log(JSON.stringify(report.summary, null, 2));
     if (opts.output) await writeFile(opts.output, JSON.stringify(report, null, 2) + '\n');
