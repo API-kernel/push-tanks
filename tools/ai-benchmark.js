@@ -13,7 +13,38 @@ import { BOT_VERSIONS as VERSIONS } from '../shared/ai/versions.js';
 export { VERSIONS };
 const mapsURL = new URL('../shared/maps/', import.meta.url);
 
-export async function simulate({ map = '1', seed = 1, versions = { 1: 'tactical-v2', 2: 'tactical-v1' }, ticks = 7200, tanks = 4, reserve = 12, bases = true, vibranium = true, players = 0, playerSide = 2, playerPolicy = 'evasive', playerLevel = 4, playerLives = 4, reaction = 6 }) {
+const simulationDefaults = { map: '1', seed: 1, versions: { 1: 'tactical-v2', 2: 'tactical-v1' }, candidateSide: null,
+    ticks: 7200, tanks: 4, reserve: 12, bases: true, vibranium: true, players: 0,
+    playerSide: 2, playerPolicy: 'evasive', playerLevel: 4, playerLives: 4, reaction: 6 };
+
+export function validateSimulationOptions(options = {}) {
+    if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Simulation options must be an object');
+    const config = { ...simulationDefaults, versions: { ...simulationDefaults.versions },
+        ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) };
+    if (typeof config.map !== 'string' || !config.map.trim()) throw new Error('map must be a nonempty map name');
+    if (!Number.isInteger(config.seed) || config.seed < 0 || config.seed > 0xFFFFFFFF) throw new Error('seed must be a uint32 integer');
+    for (const name of ['ticks', 'tanks', 'reserve', 'reaction']) {
+        if (!Number.isSafeInteger(config[name]) || config[name] < 1) throw new Error(`${name} must be a positive integer`);
+    }
+    for (const name of ['bases', 'vibranium']) if (typeof config[name] !== 'boolean') throw new Error(`${name} must be a boolean`);
+    if (!Number.isInteger(config.players) || config.players < 0 || config.players > 2) throw new Error('players must be 0, 1 or 2');
+    if (config.players > config.tanks) throw new Error('players must not exceed tanks per team');
+    if (![1, 2].includes(config.playerSide)) throw new Error('playerSide must be 1 or 2');
+    if (config.candidateSide !== null && ![1, 2].includes(config.candidateSide)) throw new Error('candidateSide must be 1 or 2');
+    if (!PLAYER_POLICIES.includes(config.playerPolicy)) throw new Error('Unknown player policy');
+    if (!Number.isInteger(config.playerLevel) || config.playerLevel < 1 || config.playerLevel > 4) throw new Error('player-level must be 1..4');
+    if (!Number.isSafeInteger(config.playerLives) || config.playerLives < 0) throw new Error('player-lives must be a nonnegative integer');
+    if (!config.versions || typeof config.versions !== 'object' || Array.isArray(config.versions)
+        || Object.keys(config.versions).length !== 2
+        || ![1, 2].every(side => Object.hasOwn(config.versions, side) && VERSIONS.includes(config.versions[side]))) {
+        throw new Error('versions must select a registered policy for each of teams 1 and 2');
+    }
+    return config;
+}
+
+export async function simulate(options = {}) {
+    const { map, seed, versions, candidateSide, ticks, tanks, reserve, bases, vibranium,
+        players, playerSide, playerPolicy, playerLevel, playerLives, reaction } = validateSimulationOptions(options);
     const mapText = await readFile(new URL(`${encodeURIComponent(map)}.json`, mapsURL), 'utf8');
     const rawMap = JSON.parse(mapText);
     const mapHash = createHash('sha256').update(mapText).digest('hex');
@@ -36,7 +67,8 @@ export async function simulate({ map = '1', seed = 1, versions = { 1: 'tactical-
             proxies.push(new PlayerProxy(room, player.id, { policy: playerPolicy, reaction }));
         }
     }
-    const metrics = { 1: { kills: 0, hits: 0, shots: 0, bonuses: 0, baseKills: 0 }, 2: { kills: 0, hits: 0, shots: 0, bonuses: 0, baseKills: 0 } };
+    const metrics = { 1: { kills: 0, playerKills: 0, botKills: 0, hits: 0, shots: 0, bonuses: 0, baseKills: 0 },
+        2: { kills: 0, playerKills: 0, botKills: 0, hits: 0, shots: 0, bonuses: 0, baseKills: 0 } };
     const started = performance.now();
     let elapsed = 0;
     let worstTickMs = 0;
@@ -53,7 +85,10 @@ export async function simulate({ map = '1', seed = 1, versions = { 1: 'tactical-
         for (const event of room.bulletEvents) {
             const m = metrics[event.team || room.players[event.ownerId]?.team];
             if (!m) continue;
-            if (event.type === 'TANK_EXPLODE') m.kills++;
+            if (event.type === 'TANK_EXPLODE') {
+                m.kills++;
+                m[event.isPlayer ? 'playerKills' : 'botKills']++;
+            }
             if (event.type === 'TANK_HIT') m.hits++;
             if (event.type === 'ENEMY_FIRE' || event.type === 'PLAYER_FIRE') m.shots++;
             if (event.type === 'BONUS_TAKEN') m.bonuses++;
@@ -64,24 +99,32 @@ export async function simulate({ map = '1', seed = 1, versions = { 1: 'tactical-
             room.activeBonus && { x: room.activeBonus.x, y: room.activeBonus.y, type: room.activeBonus.type },
             room.botsSpawnedCount, room.map]));
     }
-    return { map, mapHash, seed, versions, playerSide: players ? playerSide : null, winner: room.winnerTeamId,
+    return { map, mapHash, seed, versions, candidateSide, playerSide: players ? playerSide : null, winner: room.winnerTeamId,
         ending: room.isGameOver ? (room.winnerTeamId ? 'victory' : 'draw') : 'timeout',
         ticks: elapsed, gameSeconds: elapsed / SERVER_FPS, metrics,
         fingerprint: stateHash.digest('hex'),
-        performance: { totalMs: performance.now() - started, updateMs, meanTickMs: updateMs / elapsed, worstTickMs } };
+        performance: { timing: 'per-match-wall-clock-including-contention', scope: 'simulation-loop',
+            totalMs: performance.now() - started, updateMs, meanTickMs: updateMs / elapsed, worstTickMs } };
 }
 
 export function summarize(games, candidate) {
-    const result = { games: games.length, wins: 0, losses: 0, draws: 0, timeouts: 0,
-        candidateKills: 0, opponentKills: 0, candidateBonuses: 0, opponentBonuses: 0, candidateBaseKills: 0 };
+    const result = { outcomeBasis: 'team-game', games: games.length, wins: 0, losses: 0, draws: 0, timeouts: 0,
+        candidateKills: 0, opponentKills: 0, candidatePlayerKills: 0, opponentPlayerKills: 0,
+        candidateBotKills: 0, opponentBotKills: 0, candidateBonuses: 0, opponentBonuses: 0, candidateBaseKills: 0 };
     for (const game of games) {
-        const side = Number(Object.keys(game.versions).find(t => game.versions[t] === candidate));
+        const matchingSides = Object.keys(game.versions).filter(team => game.versions[team] === candidate);
+        const side = game.candidateSide ?? (matchingSides.length === 1 ? Number(matchingSides[0]) : null);
+        if (![1, 2].includes(side)) throw new Error('Cannot determine candidate side; set candidateSide explicitly for same-policy games');
         if (game.winner === side) result.wins++;
         else if (game.winner) result.losses++;
         else result.draws++;
         if (game.ending === 'timeout') result.timeouts++;
         result.candidateKills += game.metrics[side].kills;
         result.opponentKills += game.metrics[3 - side].kills;
+        result.candidatePlayerKills += game.metrics[side].playerKills ?? 0;
+        result.opponentPlayerKills += game.metrics[3 - side].playerKills ?? 0;
+        result.candidateBotKills += game.metrics[side].botKills ?? 0;
+        result.opponentBotKills += game.metrics[3 - side].botKills ?? 0;
         result.candidateBonuses += game.metrics[side].bonuses;
         result.opponentBonuses += game.metrics[3 - side].bonuses;
         result.candidateBaseKills += game.metrics[side].baseKills;
@@ -105,10 +148,10 @@ export async function sourceHash() {
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--help')) {
-        console.log('node tools/ai-benchmark.js [--candidate tactical-v2] [--baseline tactical-v1] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--jobs N] [--output report.json]');
+        console.log('node tools/ai-benchmark.js [--candidate tactical-v2] [--baseline tactical-v1] [--self-play true] [--maps 1,7,Bunker|all] [--seeds 1,2,3] [--ticks 7200] [--tanks 4] [--reserve 12] [--bases false] [--vibranium false] [--players 0] [--player-policy evasive|duelist|rusher] [--player-level 4] [--player-lives 4] [--reaction 6] [--jobs N] [--output report.json]');
         return;
     }
-    const allowed = new Set(['candidate', 'baseline', 'maps', 'seeds', 'ticks', 'tanks', 'reserve', 'bases', 'vibranium', 'output', 'players', 'player-policy', 'player-level', 'player-lives', 'reaction', 'jobs']);
+    const allowed = new Set(['candidate', 'baseline', 'maps', 'seeds', 'ticks', 'tanks', 'reserve', 'bases', 'vibranium', 'output', 'players', 'player-policy', 'player-level', 'player-lives', 'reaction', 'jobs', 'self-play']);
     const opts = {};
     for (let i = 0; i < args.length; i += 2) {
         const name = args[i].replace(/^--/, '');
@@ -116,7 +159,7 @@ async function main() {
         opts[name] = args[i + 1];
     }
     const candidate = opts.candidate || 'tactical-v2', baseline = opts.baseline || 'tactical-v1';
-    if (!VERSIONS.includes(candidate) || !VERSIONS.includes(baseline) || candidate === baseline) throw new Error('Select two different registered versions');
+    if (!VERSIONS.includes(candidate) || !VERSIONS.includes(baseline)) throw new Error('Select registered versions');
     const maps = opts.maps === 'all' ? (await readdir(mapsURL)).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)).sort()
         : (opts.maps || '1,7,15,Bunker,The_Void').split(',');
     const seeds = (opts.seeds || '1,2,3').split(',').map(Number);
@@ -125,20 +168,16 @@ async function main() {
         bases: opts.bases !== 'false', vibranium: opts.vibranium !== 'false',
         players: Number(opts.players || 0), playerPolicy: opts['player-policy'] || 'evasive',
         playerLevel: Number(opts['player-level'] || 4), playerLives: Number(opts['player-lives'] ?? 4), reaction: Number(opts.reaction || 6) };
-    if (!Number.isInteger(config.players) || config.players < 0 || config.players > 2) throw new Error('players must be 0, 1 or 2');
-    if (!PLAYER_POLICIES.includes(config.playerPolicy)) throw new Error('Unknown player policy');
-    if (!Number.isInteger(config.playerLevel) || config.playerLevel < 1 || config.playerLevel > 4) throw new Error('player-level must be 1..4');
-    if (!Number.isInteger(config.playerLives) || config.playerLives < 0) throw new Error('player-lives must be >= 0');
-    if (!Number.isInteger(config.reaction) || config.reaction < 1) throw new Error('reaction must be >= 1');
-    for (const name of ['ticks', 'tanks', 'reserve']) if (!Number.isInteger(config[name]) || config[name] < 1) throw new Error(`${name} must be a positive integer`);
-    for (const name of ['bases', 'vibranium']) if (opts[name] && !['true', 'false'].includes(opts[name])) throw new Error(`${name} must be true or false`);
+    validateSimulationOptions(config);
+    for (const name of ['bases', 'vibranium', 'self-play']) if (opts[name] && !['true', 'false'].includes(opts[name])) throw new Error(`${name} must be true or false`);
+    if (candidate === baseline && opts['self-play'] !== 'true' && config.players === 0) throw new Error('Same-policy games require --self-play true or --players greater than 0');
     const capacity = cpuCapacity();
     const requestedJobs = opts.jobs === undefined ? capacity.defaultJobs : validateJobs(Number(opts.jobs));
     const tasks = [];
     for (const map of maps) {
         for (const seed of seeds) {
             for (const side of [1, 2]) {
-                tasks.push({ ...config, map, seed, playerSide: 3 - side, versions: { [side]: candidate, [3 - side]: baseline } });
+                tasks.push({ ...config, map, seed, candidateSide: side, playerSide: 3 - side, versions: { [side]: candidate, [3 - side]: baseline } });
             }
         }
     }
@@ -147,11 +186,15 @@ async function main() {
     const started = performance.now();
     console.log(`Running ${tasks.length} games with ${jobs} workers (available CPUs: ${capacity.availableParallelism}, CPU quota: ${capacity.cpuQuota ?? 'unlimited'})`);
     const games = await runTournament(tasks, { jobs: requestedJobs, onProgress: ({ completed, total, index, task, result: game }) => {
-        const side = 3 - task.playerSide;
+        const side = task.candidateSide;
         console.log(`[${completed}/${total}] game=${index + 1} ${game.map} seed=${game.seed} candidate=${side} ${game.winner ? (game.winner === side ? 'WIN' : 'LOSS') : game.ending.toUpperCase()} (${game.gameSeconds.toFixed(1)}s)`);
     } });
-    const report = { candidate, baseline, sourceHash: hash, node: process.version, config, seeds,
-        execution: { backend: 'worker_threads', jobs, requestedJobs, ...capacity, totalMs: performance.now() - started },
+    const totalMs = performance.now() - started;
+    const report = { candidate, baseline, selfPlay: candidate === baseline, sourceHash: hash, node: process.version, config, seeds,
+        execution: { backend: 'worker_threads', jobs, requestedJobs, ...capacity, totalMs,
+            timing: 'pool-wall-clock-including-startup-and-cleanup',
+            gamesPerSecond: games.length * 1000 / totalMs,
+            simulatedTicksPerSecond: games.reduce((total, game) => total + game.ticks, 0) * 1000 / totalMs },
         summary: summarize(games, candidate), byMap: Object.fromEntries(maps.map(map => [map, summarize(games.filter(g => g.map === map), candidate)])), games };
     console.log(JSON.stringify(report.summary, null, 2));
     if (opts.output) await writeFile(opts.output, JSON.stringify(report, null, 2) + '\n');
