@@ -174,10 +174,10 @@ export function searchResponses(room, bot, target, {
 const desiredDirection = (bot, waypoint) => !waypoint ? null : Math.abs(waypoint.x - bot.x) > .05
     ? waypoint.x > bot.x ? 'RIGHT' : 'LEFT' : Math.abs(waypoint.y - bot.y) > .05 ? waypoint.y > bot.y ? 'DOWN' : 'UP' : null;
 
-export function withResponseSearch(Base, { maxDistance = 64, every = 12, maxSearchesPerTick = 1,
+export function withResponseSearch(Base, { maxDistance = 64, every = 12, maxSearchesPerTeamPerTick = 1,
     maxTransitions = 1024, horizon = 12, commitTicks = 4, improvement = 4 } = {}) {
     return class ReactiveResponseV6 extends Base {
-        reset() { super.reset(); this.responsePlans = new Map(); this.responseBudget = { tick: -1, count: 0 }; }
+        reset() { super.reset(); this.responsePlans = new Map(); this.responseBudget = { tick: -1, teams: new Map() }; }
         prepare() {
             super.prepare();
             const alive = new Set(this.room.enemies.map(tank => tank.id));
@@ -198,9 +198,12 @@ export function withResponseSearch(Base, { maxDistance = 64, every = 12, maxSear
                 && Math.max(bot.bulletSpeed, physical(tank).bulletSpeed) >= 250 / 60)
                 .sort((a, b) => distance(bot, a) - distance(bot, b))[0];
             if (!target) return null;
-            if (this.responseBudget.tick !== this.tick) this.responseBudget = { tick: this.tick, count: 0 };
-            if (this.responseBudget.count >= maxSearchesPerTick) return null;
-            this.responseBudget.count++;
+            if (this.responseBudget.tick !== this.tick) this.responseBudget = { tick: this.tick, teams: new Map() };
+            // Identical limits with one shared controller or separate policies:
+            // enemy update ordering must not let one team consume both quotas.
+            const used = this.responseBudget.teams.get(bot.team) || 0;
+            if (used >= maxSearchesPerTeamPerTick) return null;
+            this.responseBudget.teams.set(bot.team, used + 1);
             const desired = desiredDirection(bot, waypoint);
             const baseline = { move: inheritedShot && inheritedShot.direction !== desired ? null : desired,
                 fire: inheritedShot?.direction || null };

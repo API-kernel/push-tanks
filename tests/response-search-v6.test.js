@@ -124,7 +124,7 @@ class SteadyAim extends TacticalV5 {
 test('the mixin has a short commitment, per-tick search cap, and preserves emergency/base screens', () => {
     const { room, bot } = fixture();
     const Profile = withResponseSearch(SteadyAim,
-        { horizon: 20, maxDistance: 96, maxTransitions: 3000, maxSearchesPerTick: 1 });
+        { horizon: 20, maxDistance: 96, maxTransitions: 3000, maxSearchesPerTeamPerTick: 1 });
     const ai = new Profile(room), task = { kind: 'fight' };
     ai.tick = 1;
     assert.equal(ai.chooseShot(bot, task).responseSearch, true);
@@ -133,7 +133,7 @@ test('the mixin has a short commitment, per-tick search cap, and preserves emerg
     const second = { ...bot, id: 1002, x: 81 };
     room.enemies.push(second);
     ai.chooseShot(second, task);
-    assert.equal(ai.responseBudget.count, 1);
+    assert.equal(ai.responseBudget.teams.get(bot.team), 1);
     assert.equal(ai.responsePlans.has(second.id), false);
     ai.tick = 5;
     assert.equal(ai.combatMovementCost(bot, null, { task }), 0);
@@ -143,6 +143,30 @@ test('the mixin has a short commitment, per-tick search cap, and preserves emerg
     assert.equal(ai.responsePlans.has(bot.id), false);
     ai.emergency = false;
     assert.equal(ai.chooseShot(bot, { kind: 'guard', screen: true }).responseSearch, undefined);
+});
+
+test('per-team budgets survive team/bot order changes and match separate-policy quotas', () => {
+    for (const ordering of [[0, 1, 2, 3], [2, 3, 0, 1], [1, 0, 3, 2]]) {
+        const { room, bot } = fixture();
+        room.players = {};
+        const tanks = [bot, { ...bot, id: 1002, x: 81 },
+            { ...bot, id: 1001, team: 2, y: 48, direction: 'DOWN' },
+            { ...bot, id: 1003, team: 2, x: 81, y: 48, direction: 'DOWN' }];
+        room.enemies = ordering.map(index => tanks[index]);
+        const Profile = withResponseSearch(SteadyAim, { horizon: 20, maxDistance: 96, maxTransitions: 3000 });
+        const shared = new Profile(room), split = { 1: new Profile(room), 2: new Profile(room) };
+        shared.tick = split[1].tick = split[2].tick = 1;
+        for (const tank of room.enemies) {
+            shared.chooseShot(tank, { kind: 'fight' });
+            split[tank.team].chooseShot(tank, { kind: 'fight' });
+        }
+        assert.deepEqual([...shared.responseBudget.teams.entries()].sort(), [[1, 1], [2, 1]]);
+        assert.equal(shared.responsePlans.size, 2);
+        const separateServed = [...split[1].responsePlans.keys(), ...split[2].responsePlans.keys()].sort();
+        assert.deepEqual([...shared.responsePlans.keys()].sort(), separateServed);
+        assert.equal(split[1].responseBudget.teams.get(1), 1);
+        assert.equal(split[2].responseBudget.teams.get(2), 1);
+    }
 });
 
 test('the response mixin composes above independent V6 availability without replacing its incoming data', () => {
