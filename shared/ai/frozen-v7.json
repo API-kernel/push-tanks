@@ -1,0 +1,6 @@
+{
+  "shared/ai/tactical-v7.js": "ede9af48864b47d2419b8e0ac0a7800c6c25c9dcf84fcb0d56ebf1c90fa7d0af",
+  "shared/ai/objective-timing-v6.js": "f9195fb876dff40aa43aebfb32a0bfe80b3b210acbce182f9415abc39efce92d",
+  "shared/ai/resource-healing-v6.js": "d0098a3a617e24c3fbb88f8380f0d54d9ebdce6d92f385231e569e33628e8fe6",
+  "shared/ai/timing-path-v6.js": "05ec33312e6074d163a7d0aeec3beed617fecdcb0d3a4ab587937eb2c3b533d6"
+}
