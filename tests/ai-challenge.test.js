@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
@@ -210,7 +211,12 @@ test('shared reference pairing and raw source metadata preserve same-policy cont
     const report = await runChallenges({ candidates: ['tactical-v5'], reference: 'tactical-v5', maps: ['1'], seeds: [631],
         adversaries: ['reactive-dodge'], modes: ['encounter', 'crossfire'], levels: [4], reactions: [3], ticks: 60, jobs: 2 });
     assert.equal(report.games.length, 8);
-    for (const key of ['sourceHash', 'harnessHash', 'adversaryHash', 'frozenProxyHash', 'challengeSourceHash']) assert.match(report[key], /^[a-f0-9]{64}$/);
+    for (const key of ['sourceHash', 'harnessHash', 'adversaryHash', 'frozenProxyHash', 'evaluatorHash', 'challengeSourceHash']) assert.match(report[key], /^[a-f0-9]{64}$/);
+    const evaluator = await readFile(new URL('../tools/ai-evaluate.js', import.meta.url));
+    assert.equal(report.evaluatorHash, createHash('sha256').update(evaluator).digest('hex'));
+    const expectedHash = createHash('sha256').update([report.sourceHash, report.harnessHash, report.adversaryHash,
+        report.frozenProxyHash, report.evaluatorHash].join(':')).digest('hex');
+    assert.equal(report.challengeSourceHash, expectedHash);
     const frozen = JSON.parse(await readFile(new URL('../shared/ai/frozen-reactive-v1.json', import.meta.url), 'utf8'));
     assert.equal(report.adversaryHash, frozen['tools/reactive-player-proxy.js']);
     for (const summary of Object.values(report.comparisons['tactical-v5'].summary)) assert.equal(summary.meanDelta, 0);

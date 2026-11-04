@@ -191,11 +191,11 @@ export function summarizeChallenges(plan, games) {
 }
 
 async function challengeHashes() {
-    const files = ['tools/ai-challenge.js', 'tools/reactive-player-proxy.js', 'tools/player-proxy.js'];
+    const files = ['tools/ai-challenge.js', 'tools/reactive-player-proxy.js', 'tools/player-proxy.js', 'tools/ai-evaluate.js'];
     const [engineSourceHash, ...contents] = await Promise.all([sourceHash(), ...files.map(file => readFile(new URL(`../${file}`, import.meta.url)))]);
-    const [harnessHash, adversaryHash, frozenProxyHash] = contents.map(content => createHash('sha256').update(content).digest('hex'));
-    return { sourceHash: engineSourceHash, harnessHash, adversaryHash, frozenProxyHash,
-        challengeSourceHash: createHash('sha256').update([engineSourceHash, harnessHash, adversaryHash, frozenProxyHash].join(':')).digest('hex') };
+    const [harnessHash, adversaryHash, frozenProxyHash, evaluatorHash] = contents.map(content => createHash('sha256').update(content).digest('hex'));
+    return { sourceHash: engineSourceHash, harnessHash, adversaryHash, frozenProxyHash, evaluatorHash,
+        challengeSourceHash: createHash('sha256').update([engineSourceHash, harnessHash, adversaryHash, frozenProxyHash, evaluatorHash].join(':')).digest('hex') };
 }
 
 export async function runChallenges({ jobs, onProgress, ...options } = {}) {
