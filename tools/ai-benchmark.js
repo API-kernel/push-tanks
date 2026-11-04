@@ -42,9 +42,14 @@ export function validateSimulationOptions(options = {}) {
     return config;
 }
 
-export async function simulate(options = {}) {
+export async function simulate(options = {}, hooks = {}) {
+    if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) throw new TypeError('Simulation hooks must be an object');
+    for (const name of ['configureRoom', 'createPlayerProxy', 'observeTick']) {
+        if (hooks[name] !== undefined && typeof hooks[name] !== 'function') throw new TypeError(`${name} must be a function`);
+    }
+    const config = validateSimulationOptions(options);
     const { map, seed, versions, candidateSide, ticks, tanks, reserve, bases, vibranium,
-        players, playerSide, playerPolicy, playerLevel, playerLives, reaction } = validateSimulationOptions(options);
+        players, playerSide, playerPolicy, playerLevel, playerLives, reaction } = config;
     const mapText = await readFile(new URL(`${encodeURIComponent(map)}.json`, mapsURL), 'utf8');
     const rawMap = JSON.parse(mapText);
     const mapHash = createHash('sha256').update(mapText).digest('hex');
@@ -52,6 +57,7 @@ export async function simulate(options = {}) {
     room.settings = { ...room.settings, level: map, botVersions: versions,
         maxActiveTanks: tanks, botsReserve: { 1: reserve, 2: reserve }, basesEnabled: bases, vibraniumBase: vibranium };
     room.rawMapData = rawMap;
+    hooks.configureRoom?.(room, config);
     room.resetGame();
     const proxies = [];
     if (players > 0) {
@@ -61,10 +67,12 @@ export async function simulate(options = {}) {
             room.players[`PROXY_${index}`].team = playerSide;
         }
         room.resetGame();
-        for (const player of Object.values(room.players)) {
+        for (const [index, player] of Object.values(room.players).entries()) {
             player.level = playerLevel;
             player.hp = TANK_STATS.player.levels[playerLevel].hp;
-            proxies.push(new PlayerProxy(room, player.id, { policy: playerPolicy, reaction }));
+            proxies.push(hooks.createPlayerProxy
+                ? hooks.createPlayerProxy(room, player.id, { policy: playerPolicy, reaction, index, seed })
+                : new PlayerProxy(room, player.id, { policy: playerPolicy, reaction }));
         }
     }
     const metrics = { 1: { kills: 0, playerKills: 0, botKills: 0, hits: 0, shots: 0, bonuses: 0, baseKills: 0 },
@@ -98,6 +106,7 @@ export async function simulate(options = {}) {
         if (elapsed % 60 === 0 || elapsed === ticks || room.isGameOver) stateHash.update(JSON.stringify([room.enemies, Object.values(room.players), room.bullets,
             room.activeBonus && { x: room.activeBonus.x, y: room.activeBonus.y, type: room.activeBonus.type },
             room.botsSpawnedCount, room.map]));
+        hooks.observeTick?.({ room, elapsed, proxies });
     }
     return { map, mapHash, seed, versions, candidateSide, playerSide: players ? playerSide : null, winner: room.winnerTeamId,
         ending: room.isGameOver ? (room.winnerTeamId ? 'victory' : 'draw') : 'timeout',
