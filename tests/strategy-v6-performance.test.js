@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { GameRoom } from '../game_room.js';
+import { TacticalV5 } from '../shared/ai/tactical-v5.js';
+import { withObjectiveTimingV6 } from '../shared/ai/objective-timing-v6.js';
 import { createTickField, strategyFields } from '../shared/ai/timing-path-v6.js';
 
 function fixture() {
@@ -60,4 +62,31 @@ test('terrain sharing ends at the next strategy refresh after physical map chang
     assert.equal(next.ticksAt({ x: 8, y: 80 }), Infinity);
     const standalone = createTickField(room, bot, { crowd: false });
     assert.deepEqual(next.at({ x: 8, y: 56 }), standalone.at({ x: 8, y: 56 }));
+});
+
+
+test('a real room reset cannot reuse a same-tick field for the previous player position', () => {
+    const room = fixture(); room.addPlayer('RESET', 0, 'Reset test');
+    let player = room.players.RESET_0;
+    Object.assign(player, { team: 1, x: 32, y: 48, isSpawning: false, isDead: false });
+    const ai = new (withObjectiveTimingV6(TacticalV5))(room);
+    room.botAIs['tactical-v5'] = ai; ai.tick = 1;
+    const oldMemory = ai.memory, oldMap = room.map;
+    const first = strategyFields(ai, 'objectives', 8, 1).get(player, { allowBreach: true, crowd: false });
+    room.resetGame();
+    assert.notEqual(ai.memory, oldMemory); assert.notEqual(room.map, oldMap);
+    player = room.players.RESET_0;
+    Object.assign(player, { x: 160, y: 144, isSpawning: false, isDead: false }); ai.tick = 1;
+    const next = strategyFields(ai, 'objectives', 8, 1).get(player, { allowBreach: true, crowd: false });
+    assert.notEqual(next, first);
+    assert.equal(next.ticksAt(player), 0);
+    assert.notEqual(first.ticksAt(player), 0);
+});
+
+test('cache lifetime follows memory reset even when the map object and tick are unchanged', () => {
+    const room = fixture(), controller = { room, tick: 1, memory: new Map() }, bot = room.enemies[0];
+    const first = strategyFields(controller, 'objectives', 8, 1).get(bot, { crowd: false });
+    controller.memory = new Map(); Object.assign(bot, { x: 8, y: 80 });
+    const next = strategyFields(controller, 'objectives', 8, 1).get(bot, { crowd: false });
+    assert.notEqual(next, first); assert.equal(next.ticksAt(bot), 0);
 });

@@ -205,7 +205,9 @@ export function createTickField(room, tank, { allowBreach = false, maxExpansions
     };
 }
 
-// Shared only within one strategy refresh. Each planning team owns half the
+// Shared only within one strategy refresh. Controller.reset() replaces memory;
+// bind the cache to that identity and map, even if tick and tank IDs repeat.
+// Each planning team owns half the
 // request slots, including requests for enemy race/threat fields. Cache hits
 // reuse computation but consume the same request slot on either side: iteration
 // order cannot grant the second team extra information or exhaust its budget.
@@ -213,8 +215,8 @@ export function strategyFields(controller, feature, limit = 8, team) {
     if (team !== 1 && team !== 2) throw new RangeError('strategy field requests require a planning team');
     controller.strategyFieldsV6 ??= new Map();
     let cache = controller.strategyFieldsV6.get(feature);
-    if (!cache || cache.tick !== controller.tick) {
-        cache = { tick: controller.tick, map: controller.room.map, fields: new Map(), terrain: new Map(),
+    if (!cache || cache.tick !== controller.tick || cache.memory !== controller.memory || cache.map !== controller.room.map) {
+        cache = { tick: controller.tick, memory: controller.memory, map: controller.room.map, fields: new Map(), terrain: new Map(),
             count: 0, requests: new Map([[1, new Set()], [2, new Set()]]) };
         controller.strategyFieldsV6.set(feature, cache);
     }
@@ -229,9 +231,6 @@ export function strategyFields(controller, feature, limit = 8, team) {
         cache.count++;
         // Terrain depends on team protection and level-four penetration only.
         // Clear-only fields can share one snapshot across both teams.
-        if (cache.map !== controller.room.map) {
-            cache.terrain.clear(); cache.map = controller.room.map;
-        }
         const terrainKey = options.allowBreach ? `${tank.team}:${(tank.level || 1) >= 4}` : 'clear';
         if (!cache.terrain.has(terrainKey)) cache.terrain.set(terrainKey, tickTerrain(controller.room, tank, !!options.allowBreach));
         const field = createTickField(controller.room, tank, { ...options, _terrain: cache.terrain.get(terrainKey) });
