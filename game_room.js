@@ -17,8 +17,8 @@ export class GameRoom {
     constructor(roomId, io = null, mapList = [], options = {}) {
         this.id = roomId;
         this.silent = options.silent || false;
-        this.playerStartLevel = options.playerStartLevel ?? TANK_STATS.player.startLevel;
-        if (!Number.isInteger(this.playerStartLevel) || !TANK_STATS.player.levels[this.playerStartLevel]) {
+        const playerStartLevel = options.playerStartLevel ?? TANK_STATS.player.startLevel;
+        if (!Number.isInteger(playerStartLevel) || !TANK_STATS.player.levels[playerStartLevel]) {
             throw new RangeError('playerStartLevel must be 1..4');
         }
         this.random = options.seed === undefined ? Math.random : seededRandom(options.seed);
@@ -69,6 +69,7 @@ export class GameRoom {
             allowHotJoin: true,
             friendlyFire: false,
             startLives: 4,
+            playerStartLevel,
             maxActiveTanks: 6,
             botsReserve: { 1: 20, 2: 20 } 
         };
@@ -148,9 +149,9 @@ export class GameRoom {
             speed: TANK_STATS.player.speed,
             direction: teamConfig ? teamConfig.direction : 'UP',
             isMoving: false, 
-            hp: TANK_STATS.player.levels[this.playerStartLevel].hp,
+            hp: TANK_STATS.player.levels[this.settings.playerStartLevel].hp,
             lives: this.settings.startLives,
-            level: this.playerStartLevel,
+            level: this.settings.playerStartLevel,
             isDead: (teamId === 0), // Зритель сразу мертв
             respawnTimer: 0,
             isSpawning: (teamId > 0), // Зритель не спавнится
@@ -193,6 +194,11 @@ export class GameRoom {
     }
 
     updateSettings(newSettings) {
+        if (!newSettings || typeof newSettings !== 'object' || Array.isArray(newSettings)) return false;
+        if (Object.hasOwn(newSettings, 'playerStartLevel') &&
+            (!Number.isInteger(newSettings.playerStartLevel) || !TANK_STATS.player.levels[newSettings.playerStartLevel])) {
+            return false;
+        }
         this.settings = { ...this.settings, ...newSettings };
 
         // ПРОВЕРКА ЛИМИТОВ ПОСЛЕ ИЗМЕНЕНИЯ
@@ -215,6 +221,7 @@ export class GameRoom {
                 }
             }
         });
+        return true;
     }
 
     async startGame() {
@@ -427,7 +434,7 @@ export class GameRoom {
                 p.isDead = false;
                 p.isSpawning = true;
                 p.spawnAnimTimer = 0;
-                p.level = this.playerStartLevel;
+                p.level = this.settings.playerStartLevel;
                 p.hp = TANK_STATS.player.levels[p.level].hp;
                 
                 this.assignSpawnPosition(p);
@@ -672,7 +679,7 @@ export class GameRoom {
             p.isSpawning = true;
             p.spawnAnimTimer = 0;
             p.lives = this.settings.startLives
-            p.level = this.playerStartLevel;
+            p.level = this.settings.playerStartLevel;
             p.hp = TANK_STATS.player.levels[p.level].hp;
             
             this.assignSpawnPosition(p); 

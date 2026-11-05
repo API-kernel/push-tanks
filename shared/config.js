@@ -49,7 +49,7 @@ export const TANK_STATS = {
     heavy:  { speed: TANK_SPEED_SLOW / SERVER_FPS, hp: 4, bulletSpeed: BULLET_SPEED_FAST / SERVER_FPS, bulletCooldown: SERVER_FPS, canBreakSteel: false, spriteKey: 'heavy'},
 
     player: { 
-        startLevel: 3, // 1 = без звёзд, 2 = одна, 3 = две, 4 = три
+        startLevel: 1, // 1 = без звёзд, 2 = одна, 3 = две, 4 = три
         speed: TANK_SPEED_FAST / SERVER_FPS, 
         levels: {
             1: { bulletSpeed: BULLET_SPEED_SLOW / SERVER_FPS, hp: 1, bulletCount: 1, cooldown: Math.floor(0.33 * SERVER_FPS), canBreakSteel: false }, 

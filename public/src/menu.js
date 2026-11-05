@@ -19,6 +19,7 @@ window.toggleDonate = (show) => {
 window.changeSettings = () => {
     const level = document.getElementById('opt-level-select').value;
     const lives = parseInt(document.getElementById('opt-lives').value);
+    const playerStartLevel = Number(document.getElementById('opt-player-start-level').value);
     
     const maxActiveTanks = parseInt(document.getElementById('opt-max-active').value);
     
@@ -34,6 +35,7 @@ window.changeSettings = () => {
         window.tankGame.updateSettings({ 
             level, 
             startLives: lives, 
+            playerStartLevel,
             maxActiveTanks: maxActiveTanks,
             basesEnabled: bases,
             vibraniumBase: vibranium,
@@ -370,6 +372,7 @@ window.updateLobbyUI = (data) => {
 
         setVal('opt-hotjoin', s.allowHotJoin, true);
         setVal('opt-lives', s.startLives);
+        setVal('opt-player-start-level', s.playerStartLevel ?? 1);
         setVal('opt-max-active', s.maxActiveTanks);
         setVal('opt-bots-green', s.botsReserve[1]);
         setVal('opt-bots-red', s.botsReserve[2]);
