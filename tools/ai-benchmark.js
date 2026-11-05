@@ -53,7 +53,8 @@ export async function simulate(options = {}, hooks = {}) {
     const mapText = await readFile(new URL(`${encodeURIComponent(map)}.json`, mapsURL), 'utf8');
     const rawMap = JSON.parse(mapText);
     const mapHash = createHash('sha256').update(mapText).digest('hex');
-    const room = new GameRoom('BENCH', null, [], { seed, silent: true });
+    // Keep the historical respawn rules fixed across AI comparisons.
+    const room = new GameRoom('BENCH', null, [], { seed, silent: true, playerStartLevel: 1 });
     room.settings = { ...room.settings, level: map, botVersions: versions,
         maxActiveTanks: tanks, botsReserve: { 1: reserve, 2: reserve }, basesEnabled: bases, vibraniumBase: vibranium };
     room.rawMapData = rawMap;

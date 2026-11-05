@@ -17,6 +17,10 @@ export class GameRoom {
     constructor(roomId, io = null, mapList = [], options = {}) {
         this.id = roomId;
         this.silent = options.silent || false;
+        this.playerStartLevel = options.playerStartLevel ?? TANK_STATS.player.startLevel;
+        if (!Number.isInteger(this.playerStartLevel) || !TANK_STATS.player.levels[this.playerStartLevel]) {
+            throw new RangeError('playerStartLevel must be 1..4');
+        }
         this.random = options.seed === undefined ? Math.random : seededRandom(options.seed);
         this.teamRandom = {
             1: options.seed === undefined ? Math.random : seededRandom(options.seed ^ 0x12345678),
@@ -144,9 +148,9 @@ export class GameRoom {
             speed: TANK_STATS.player.speed,
             direction: teamConfig ? teamConfig.direction : 'UP',
             isMoving: false, 
-            hp: TANK_STATS.player.levels[1].hp, 
+            hp: TANK_STATS.player.levels[this.playerStartLevel].hp,
             lives: this.settings.startLives,
-            level: 1,
+            level: this.playerStartLevel,
             isDead: (teamId === 0), // Зритель сразу мертв
             respawnTimer: 0,
             isSpawning: (teamId > 0), // Зритель не спавнится
@@ -423,8 +427,8 @@ export class GameRoom {
                 p.isDead = false;
                 p.isSpawning = true;
                 p.spawnAnimTimer = 0;
-                p.level = 1;
-                p.hp = TANK_STATS.player.levels[1].hp;
+                p.level = this.playerStartLevel;
+                p.hp = TANK_STATS.player.levels[p.level].hp;
                 
                 this.assignSpawnPosition(p);
                 const teamConfig = this.teamManager.getTeam(p.team);
@@ -668,7 +672,8 @@ export class GameRoom {
             p.isSpawning = true;
             p.spawnAnimTimer = 0;
             p.lives = this.settings.startLives
-            p.level = 1;
+            p.level = this.playerStartLevel;
+            p.hp = TANK_STATS.player.levels[p.level].hp;
             
             this.assignSpawnPosition(p); 
 
